@@ -11,6 +11,10 @@ export default defineConfig(async () => ({
   test: {
     environment: 'node',
   },
+  // ponytail: local desktop app, not served over a network — chunk size warning is noise
+  build: {
+    chunkSizeWarningLimit: 1200,
+  },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

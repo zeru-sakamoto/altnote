@@ -96,6 +96,49 @@ function findTagFor(scopes: string[]): Tag | Tag[] | undefined {
   return undefined;
 }
 
+/** Parses `#rgb`, `#rrggbb`, or `#rrggbbaa` (alpha ignored) into 0-255 channels. */
+function hexToRgb(hex: string): [number, number, number] | undefined {
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3 || h.length === 4) {
+    h = h
+      .slice(0, 3)
+      .split('')
+      .map((c) => c + c)
+      .join('');
+  } else if (h.length === 6 || h.length === 8) {
+    h = h.slice(0, 6);
+  } else {
+    return undefined;
+  }
+  const num = Number.parseInt(h, 16);
+  if (Number.isNaN(num)) return undefined;
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+function tintFrom(hex: string, alpha: number, fallback: string): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return fallback;
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+}
+
+/**
+ * Selection and active-line are computed from the theme's own colors rather than trusting
+ * `editor.selectionBackground`/`editor.lineHighlightBackground` directly — imported VS Code
+ * themes represent these wildly inconsistently (opaque hex, 8-digit hex with alpha, or
+ * missing entirely) and some read as nearly invisible, or too close to each other, in this
+ * app's rendering. Deriving both guarantees legible, theme-appropriate contrast: selection
+ * tints the theme's own accent/link color (a hue distinct from body text, so it never blends
+ * into the neutral active-line indicator), while active-line stays a low-alpha neutral tint
+ * of the foreground, consistently subtle across every theme.
+ */
+function selectionColorFrom(accent: string): string {
+  return tintFrom(accent, 0.28, 'rgba(80, 150, 255, 0.3)');
+}
+
+function activeLineColorFrom(foreground: string): string {
+  return tintFrom(foreground, 0.06, 'rgba(128, 128, 128, 0.06)');
+}
+
 function fontStyleFlags(fontStyle?: string) {
   return {
     fontStyle: fontStyle?.includes('italic') ? 'italic' : undefined,
@@ -137,21 +180,20 @@ export function convertTheme(theme: VSCodeTheme): ConvertedTheme {
     colors['editor.background'] ?? (dark ? '#1e1e1e' : '#ffffff');
   const editorFg =
     colors['editor.foreground'] ?? (dark ? '#d4d4d4' : '#1a1a1a');
+  const editorLink = colors['textLink.foreground'] ?? '#4ea1ff';
 
   const cssVars: Record<string, string> = {
     '--editor-bg': editorBg,
     '--editor-fg': editorFg,
     '--editor-gutter-fg': colors['editorLineNumber.foreground'] ?? editorFg,
-    '--editor-active-line':
-      colors['editor.lineHighlightBackground'] ?? 'rgba(128, 128, 128, 0.1)',
-    '--editor-selection':
-      colors['editor.selectionBackground'] ?? 'rgba(80, 150, 255, 0.3)',
+    '--editor-active-line': activeLineColorFrom(editorFg),
+    '--editor-selection': selectionColorFrom(editorLink),
     '--titlebar-bg':
       colors['titleBar.activeBackground'] ??
       colors['sideBar.background'] ??
       editorBg,
     '--titlebar-fg': colors['titleBar.activeForeground'] ?? editorFg,
-    '--editor-link': colors['textLink.foreground'] ?? '#4ea1ff',
+    '--editor-link': editorLink,
   };
 
   return { name: theme.name ?? 'Custom Theme', dark, highlightStyle, cssVars };

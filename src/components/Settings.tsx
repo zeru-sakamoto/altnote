@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useSettings, setFont } from '../settings/store';
+import { useSettings, setFont, setAutoSave } from '../settings/store';
 import ThemePicker from './ThemePicker';
 import styles from './Settings.module.css';
 
@@ -90,6 +90,18 @@ export default function Settings({ onClose }: Props) {
           >
             The quick brown fox jumps over the lazy dog. 0123456789
           </p>
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="autosave-toggle" className={styles.checkboxLabel}>
+            <input
+              id="autosave-toggle"
+              type="checkbox"
+              checked={settings.autoSave}
+              onChange={(e) => setAutoSave(e.currentTarget.checked)}
+            />
+            Auto Save (saves ~1s after you stop typing)
+          </label>
         </div>
 
         <ThemePicker />

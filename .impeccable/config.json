@@ -16,6 +16,13 @@
         "files": ["src/components/PreviewPane.module.css"],
         "createdAt": "2026-08-14T20:15:27.819Z",
         "reason": "blockquote left-border is a standard markdown-quote convention, not a card accent; rule ported verbatim from the pre-existing Svelte component being migrated, unchanged in this session"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": ["src/editor/livePreview.ts"],
+        "createdAt": "2026-08-15T04:33:24.416Z",
+        "reason": "blockquote left-border is the canonical Markdown blockquote treatment (GitHub/Notion/Obsidian/native <blockquote>), not a dashboard-card accent stripe; matches the Obsidian-style live preview the user explicitly requested"
       }
     ]
   }

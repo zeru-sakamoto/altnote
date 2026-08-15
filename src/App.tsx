@@ -10,6 +10,7 @@ import {
   useSettings,
   initSettings,
   setWrapDefault,
+  setLiveMarkdownPreview,
   addRecentFile,
   removeRecentFile,
 } from './settings/store';
@@ -26,6 +27,8 @@ import {
 import { message } from '@tauri-apps/plugin-dialog';
 import styles from './App.module.css';
 
+const AUTO_SAVE_DELAY_MS = 1000;
+
 export default function App() {
   const settings = useSettings();
 
@@ -34,7 +37,6 @@ export default function App() {
   const [dirty, setDirty] = useState(false);
   const [wrap, setWrap] = useState(true);
   const [docText, setDocText] = useState('');
-  const [liveMarkdownPreview, setLiveMarkdownPreview] = useState(true);
   const [showPreviewPane, setShowPreviewPane] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const editorRef = useRef<EditorHandle>(null);
@@ -134,7 +136,7 @@ export default function App() {
   }
 
   function toggleLiveMarkdownPreview() {
-    setLiveMarkdownPreview((v) => !v);
+    setLiveMarkdownPreview(!settings.liveMarkdownPreview);
   }
 
   function togglePreviewPane() {
@@ -195,6 +197,15 @@ export default function App() {
     void getCurrentWindow().setTitle(windowTitle);
   }, [windowTitle]);
 
+  // Debounced autosave: only for documents that already have a disk path,
+  // so this never silently pops a Save As dialog while the user is typing.
+  useEffect(() => {
+    if (!settings.autoSave || !dirty || !path) return;
+    const timer = setTimeout(() => void performSave(), AUTO_SAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docText, settings.autoSave, dirty, path]);
+
   // Applied to the document root (not just `.app`) so it also reaches the
   // Settings panel, which renders as a sibling of <main> and wouldn't
   // otherwise inherit a CSS var scoped to it.
@@ -227,7 +238,7 @@ export default function App() {
           title={windowTitle}
           wrap={wrap}
           isMd={isMd}
-          liveMarkdownPreview={liveMarkdownPreview}
+          liveMarkdownPreview={settings.liveMarkdownPreview}
           showPreviewPane={showPreviewPane}
           onNew={() => void newFile()}
           onOpen={() => void doOpen()}
@@ -245,8 +256,9 @@ export default function App() {
             <Editor
               ref={editorRef}
               fileName={fileName}
+              filePath={path}
               wrap={wrap}
-              liveMarkdownPreview={liveMarkdownPreview}
+              liveMarkdownPreview={settings.liveMarkdownPreview}
               initialContent=""
               onChange={(text, isUserEdit) => {
                 setDocText(text);

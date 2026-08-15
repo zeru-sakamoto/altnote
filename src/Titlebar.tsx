@@ -67,7 +67,7 @@ export default function Titlebar({
     <div className={styles.titlebar}>
       <div className={styles.menu}>
         <button className={styles.menuButton} title="Menu" onClick={toggleMenu}>
-          <svg width="16" height="16" viewBox="0 0 16 16">
+          <svg width="20" height="20" viewBox="0 0 16 16">
             <path
               d="M3 5h10M3 8h10M3 11h10"
               stroke="currentColor"

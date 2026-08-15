@@ -20,7 +20,7 @@ body,
   --editor-bg: #ffffff;
   --editor-fg: #1a1a1a;
   --editor-gutter-fg: #6c6c6c;
-  --editor-active-line: rgba(0, 0, 0, 0.05);
+  --editor-active-line: rgba(0, 0, 0, 0.035);
   --editor-selection: rgba(0, 90, 200, 0.2);
 
   color: #1a1a1a;
@@ -43,7 +43,7 @@ body,
     --editor-bg: #1e1e1e;
     --editor-fg: #d4d4d4;
     --editor-gutter-fg: #6e7681;
-    --editor-active-line: rgba(255, 255, 255, 0.06);
+    --editor-active-line: rgba(255, 255, 255, 0.04);
     --editor-selection: rgba(80, 150, 255, 0.3);
 
     color: #e8e8e8;

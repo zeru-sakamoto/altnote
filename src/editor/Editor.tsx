@@ -5,7 +5,7 @@ import { syntaxHighlighting } from '@codemirror/language';
 import { basicSetup } from 'codemirror';
 import { vsCodeKeymap } from './keymap';
 import { languageForFile, isMarkdownFile } from './languages';
-import { livePreview } from './livePreview';
+import { livePreview, currentFilePath } from './livePreview';
 import { slashCommands } from './slashCommands';
 import { getActiveTheme } from '../theme/store';
 import { subscribe as subscribeSettings } from '../settings/store';
@@ -19,6 +19,7 @@ export interface EditorHandle {
 
 interface Props {
   fileName: string;
+  filePath: string | null;
   wrap: boolean;
   liveMarkdownPreview: boolean;
   initialContent?: string;
@@ -47,6 +48,9 @@ const editorTheme = EditorView.theme({
     color: 'var(--editor-fg)',
   },
   '.cm-content': { caretColor: 'var(--editor-fg)' },
+  // drawSelection() renders the visible caret as a `.cm-cursor` div with a
+  // hardcoded border color, ignoring `caretColor` above — override it directly.
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--editor-fg)' },
   '.cm-scroller': {
     fontFamily: 'var(--editor-font, ui-monospace, monospace)',
   },
@@ -57,7 +61,14 @@ const editorTheme = EditorView.theme({
   },
   '.cm-activeLine': { backgroundColor: 'var(--editor-active-line)' },
   '.cm-activeLineGutter': { backgroundColor: 'var(--editor-active-line)' },
-  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+  '.cm-selectionBackground': {
+    backgroundColor: 'var(--editor-selection)',
+  },
+  // drawSelection()'s own focused-state rule is
+  // `.<theme>.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground`
+  // (5 class selectors) — this app never sets EditorView.darkTheme, so CodeMirror's
+  // built-in light-theme color wins that specificity fight while focused unless matched.
+  '&.cm-focused .cm-scroller .cm-selectionLayer .cm-selectionBackground': {
     backgroundColor: 'var(--editor-selection)',
   },
   '.cm-tooltip': {
@@ -76,7 +87,14 @@ const editorTheme = EditorView.theme({
 });
 
 const Editor = forwardRef<EditorHandle, Props>(function Editor(
-  { fileName, wrap, liveMarkdownPreview, initialContent = '', onChange },
+  {
+    fileName,
+    filePath,
+    wrap,
+    liveMarkdownPreview,
+    initialContent = '',
+    onChange,
+  },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +108,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     livePreview: new Compartment(),
     slashCommands: new Compartment(),
     theme: new Compartment(),
+    filePath: new Compartment(),
   }).current;
 
   useImperativeHandle(
@@ -120,13 +139,14 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         basicSetup,
         editorTheme,
         Prec.highest(vsCodeKeymap),
-        compartments.language.of(languageForFile(fileName) ?? []),
+        compartments.language.of([]),
         compartments.wrap.of(wrap ? EditorView.lineWrapping : []),
         compartments.livePreview.of(
           livePreviewExtension(fileName, liveMarkdownPreview),
         ),
         compartments.slashCommands.of(slashCommandsExtension(fileName)),
         compartments.theme.of(themeExtension()),
+        compartments.filePath.of(currentFilePath.of(filePath)),
         EditorView.updateListener.of((update) => {
           if (!update.docChanged) return;
           const isLoad = update.transactions.some((tr) =>
@@ -144,11 +164,23 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   }, []);
 
   useEffect(() => {
-    viewRef.current?.dispatch({
-      effects: compartments.language.reconfigure(
-        languageForFile(fileName) ?? [],
-      ),
+    let cancelled = false;
+    const pending = languageForFile(fileName);
+    if (!pending) {
+      viewRef.current?.dispatch({
+        effects: compartments.language.reconfigure([]),
+      });
+      return;
+    }
+    pending.then((language) => {
+      if (cancelled) return;
+      viewRef.current?.dispatch({
+        effects: compartments.language.reconfigure(language),
+      });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [fileName]);
 
   useEffect(() => {
@@ -174,6 +206,12 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       ),
     });
   }, [fileName]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: compartments.filePath.reconfigure(currentFilePath.of(filePath)),
+    });
+  }, [filePath]);
 
   // Editor has no theme prop — theme changes originate in Settings/ThemePicker, so this
   // subscribes directly to the settings store rather than depending on props.

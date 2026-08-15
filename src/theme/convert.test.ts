@@ -29,6 +29,43 @@ describe('convertTheme', () => {
     expect(converted.cssVars['--editor-fg']).toBe('#1a1a1a');
     expect(converted.highlightStyle.specs).toHaveLength(0);
   });
+
+  it('derives the selection color from the accent/link color, not the theme-provided one', () => {
+    // Dracula's own editor.selectionBackground (#44475A) should be ignored in favor of a
+    // translucent tint of its link color — it has none defined, so this falls back to the
+    // app default accent (#4ea1ff), giving selection a hue distinct from the neutral
+    // foreground-tinted active-line highlight.
+    const converted = convertTheme(dracula);
+    expect(converted.cssVars['--editor-selection']).toBe(
+      'rgba(78, 161, 255, 0.28)',
+    );
+  });
+
+  it('derives the active-line color from the foreground at a low, consistent alpha', () => {
+    // Dracula's own editor.lineHighlightBackground is unset; regardless, this app always
+    // computes its own low-alpha neutral tint rather than trusting a theme's raw value
+    // (which varies from fully-opaque to nearly-invisible across imported themes).
+    const converted = convertTheme(dracula);
+    expect(converted.cssVars['--editor-active-line']).toBe(
+      'rgba(248, 248, 242, 0.06)',
+    );
+  });
+
+  it('falls back to fixed defaults when the relevant color is not parseable hex', () => {
+    const converted = convertTheme({
+      name: 'Weird',
+      colors: {
+        'editor.foreground': 'not-a-color',
+        'textLink.foreground': 'also-not-a-color',
+      },
+    });
+    expect(converted.cssVars['--editor-selection']).toBe(
+      'rgba(80, 150, 255, 0.3)',
+    );
+    expect(converted.cssVars['--editor-active-line']).toBe(
+      'rgba(128, 128, 128, 0.06)',
+    );
+  });
 });
 
 describe('parseThemeJson', () => {

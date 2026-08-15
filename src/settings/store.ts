@@ -14,6 +14,8 @@ export interface Settings {
   recentFiles: string[];
   themeId: string | null;
   customThemes: CachedTheme[];
+  liveMarkdownPreview: boolean;
+  autoSave: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -22,6 +24,8 @@ const DEFAULTS: Settings = {
   recentFiles: [],
   themeId: null,
   customThemes: [],
+  liveMarkdownPreview: true,
+  autoSave: false,
 };
 const MAX_RECENT = 8;
 const MAX_CUSTOM_THEMES = 10;
@@ -55,12 +59,22 @@ export function useSettings(): Settings {
 
 export async function initSettings() {
   backingStore = await load('settings.json');
-  const [font, wrap, recentFiles, themeId, customThemes] = await Promise.all([
+  const [
+    font,
+    wrap,
+    recentFiles,
+    themeId,
+    customThemes,
+    liveMarkdownPreview,
+    autoSave,
+  ] = await Promise.all([
     backingStore.get<string | null>('font'),
     backingStore.get<boolean>('wrap'),
     backingStore.get<string[]>('recentFiles'),
     backingStore.get<string | null>('themeId'),
     backingStore.get<CachedTheme[]>('customThemes'),
+    backingStore.get<boolean>('liveMarkdownPreview'),
+    backingStore.get<boolean>('autoSave'),
   ]);
   const patch: Partial<Settings> = {};
   if (font !== undefined) patch.font = font;
@@ -68,6 +82,9 @@ export async function initSettings() {
   if (recentFiles !== undefined) patch.recentFiles = recentFiles;
   if (themeId !== undefined) patch.themeId = themeId;
   if (customThemes !== undefined) patch.customThemes = customThemes;
+  if (liveMarkdownPreview !== undefined)
+    patch.liveMarkdownPreview = liveMarkdownPreview;
+  if (autoSave !== undefined) patch.autoSave = autoSave;
   setState(patch);
 }
 
@@ -79,6 +96,16 @@ export function setFont(font: string | null) {
 export function setWrapDefault(wrap: boolean) {
   setState({ wrap });
   void backingStore?.set('wrap', wrap);
+}
+
+export function setLiveMarkdownPreview(liveMarkdownPreview: boolean) {
+  setState({ liveMarkdownPreview });
+  void backingStore?.set('liveMarkdownPreview', liveMarkdownPreview);
+}
+
+export function setAutoSave(autoSave: boolean) {
+  setState({ autoSave });
+  void backingStore?.set('autoSave', autoSave);
 }
 
 export function addRecentFile(path: string) {

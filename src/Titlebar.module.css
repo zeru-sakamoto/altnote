@@ -13,12 +13,12 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  padding: 0 4px;
+  padding: 2px;
 }
 
 .menuButton {
-  width: 32px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 4px;
 }
 
@@ -107,7 +107,10 @@
   outline: none;
 }
 
-.menuButton,
+.menuButton {
+  justify-content: center;
+}
+
 .controls button {
   width: 44px;
   justify-content: center;
