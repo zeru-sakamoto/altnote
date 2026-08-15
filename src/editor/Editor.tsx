@@ -214,11 +214,19 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   }, [filePath]);
 
   // Editor has no theme prop — theme changes originate in Settings/ThemePicker, so this
-  // subscribes directly to the settings store rather than depending on props.
+  // subscribes directly to the settings store rather than depending on props. The store
+  // notifies on every settings change (not just theme ones), so skip the reconfigure —
+  // which forces CodeMirror to redo syntax highlighting — unless the theme actually did.
   useEffect(() => {
+    let lastTheme = getActiveTheme();
     const reconfigureTheme = () => {
+      const theme = getActiveTheme();
+      if (theme === lastTheme) return;
+      lastTheme = theme;
       viewRef.current?.dispatch({
-        effects: compartments.theme.reconfigure(themeExtension()),
+        effects: compartments.theme.reconfigure(
+          theme ? syntaxHighlighting(theme.highlightStyle) : [],
+        ),
       });
     };
     return subscribeSettings(reconfigureTheme);

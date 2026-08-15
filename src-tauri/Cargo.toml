@@ -1,6 +1,6 @@
 [package]
 name = "c-usersanzelappdatalocaltempaltnote-scaffold"
-version = "0.1.0"
+version = "1.0.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -30,4 +30,13 @@ flate2 = "1.1.9"
 zip = "8.6.0"
 jsonc-parser = { version = "0.33.1", features = ["serde"] }
 tauri-plugin-persisted-scope = "2.3.7"
+tauri-plugin-single-instance = "2"
+urlencoding = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
 

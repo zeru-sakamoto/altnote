@@ -23,8 +23,14 @@ const UNDERLINE = Decoration.mark({ class: 'cm-md-underline' });
 const CODE = Decoration.mark({ class: 'cm-md-code' });
 const LINK = Decoration.mark({ class: 'cm-md-link' });
 const LIST_MARK = Decoration.mark({ class: 'cm-md-listmark' });
+const HIGHLIGHT = Decoration.mark({ class: 'cm-md-highlight' });
+const SUPER = Decoration.mark({ class: 'cm-md-super' });
+const SUB = Decoration.mark({ class: 'cm-md-sub' });
+const FOOTNOTE_REF = Decoration.mark({ class: 'cm-md-footnote-ref' });
 const QUOTE_LINE = Decoration.line({ class: 'cm-md-quote-line' });
 const CODEBLOCK_LINE = Decoration.line({ class: 'cm-md-codeblock-line' });
+const LINKREF_LINE = Decoration.line({ class: 'cm-md-linkref-line' });
+const FOOTNOTE_DEF_LINE = Decoration.line({ class: 'cm-md-footnote-def-line' });
 const HEADING: Record<string, Decoration> = {
   ATXHeading1: Decoration.mark({ class: 'cm-md-h cm-md-h1' }),
   ATXHeading2: Decoration.mark({ class: 'cm-md-h cm-md-h2' }),
@@ -44,6 +50,10 @@ const HIDEABLE_MARKS = new Set([
   'LinkMark',
   'QuoteMark',
   'StrikethroughMark',
+  'HighlightMark',
+  'SuperscriptMark',
+  'SubscriptMark',
+  'FootnoteDefMark',
 ]);
 
 class HrWidget extends WidgetType {
@@ -127,6 +137,8 @@ function buildDecorations(view: EditorView): DecorationSet {
   const cursorLine = view.state.doc.lineAt(view.state.selection.main.head);
   const quoteLines = new Set<number>();
   const codeLines = new Set<number>();
+  const linkRefLines = new Set<number>();
+  const footnoteDefLines = new Set<number>();
   let pendingUnderlineOpen: {
     from: number;
     to: number;
@@ -215,6 +227,44 @@ function buildDecorations(view: EditorView): DecorationSet {
           markSpannedLines(view, node, quoteLines);
         } else if (type === 'FencedCode') {
           markSpannedLines(view, node, codeLines);
+        } else if (type === 'Autolink') {
+          // The whole `<https://...>` span is the visible content (unlike an
+          // inline link's separate text/URL parts), so style it and stop —
+          // descending would let the generic URL-hiding branch below erase it.
+          ranges.push(LINK.range(node.from, node.to));
+          return false;
+        } else if (type === 'LinkReference') {
+          markSpannedLines(view, node, linkRefLines);
+        } else if (type === 'Superscript') {
+          ranges.push(SUPER.range(node.from, node.to));
+        } else if (type === 'Subscript') {
+          ranges.push(SUB.range(node.from, node.to));
+        } else if (type === 'Highlight') {
+          ranges.push(HIGHLIGHT.range(node.from, node.to));
+        } else if (type === 'FootnoteRef') {
+          ranges.push(FOOTNOTE_REF.range(node.from, node.to));
+        } else if (type === 'FootnoteDef') {
+          markSpannedLines(view, node, footnoteDefLines);
+        } else if (type === 'WikiLink') {
+          // Brackets + `target|` prefix are hidden via raw-text
+          // slicing rather than dedicated child nodes for the label/alias —
+          // matches the Image alt-text extraction below, no grammar needed.
+          const raw = view.state.doc.sliceString(node.from, node.to);
+          const pipeIndex = raw.indexOf('|');
+          if (onCursorLine) {
+            ranges.push(MARK_STYLE.range(node.from, node.from + 2));
+            ranges.push(MARK_STYLE.range(node.to - 2, node.to));
+          } else {
+            ranges.push(HIDE.range(node.from, node.from + 2));
+            ranges.push(HIDE.range(node.to - 2, node.to));
+            if (pipeIndex >= 0) {
+              ranges.push(
+                HIDE.range(node.from + 2, node.from + 2 + pipeIndex + 1),
+              );
+            }
+          }
+          ranges.push(LINK.range(node.from, node.to));
+          return false;
         } else if (type === 'HTMLTag') {
           // No native Markdown underline syntax; Obsidian's own convention (and ours)
           // is raw `<u>...</u>` HTML, which the base CommonMark parser already tokenizes.
@@ -255,6 +305,12 @@ function buildDecorations(view: EditorView): DecorationSet {
   for (const lineNo of codeLines) {
     ranges.push(CODEBLOCK_LINE.range(view.state.doc.line(lineNo).from));
   }
+  for (const lineNo of linkRefLines) {
+    ranges.push(LINKREF_LINE.range(view.state.doc.line(lineNo).from));
+  }
+  for (const lineNo of footnoteDefLines) {
+    ranges.push(FOOTNOTE_DEF_LINE.range(view.state.doc.line(lineNo).from));
+  }
 
   return Decoration.set(ranges, true);
 }
@@ -266,7 +322,12 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view);
     }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      if (
+        update.docChanged ||
+        update.viewportChanged ||
+        update.selectionSet ||
+        syntaxTree(update.startState) !== syntaxTree(update.state)
+      ) {
         this.decorations = buildDecorations(update.view);
       }
     }
@@ -307,6 +368,31 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   '.cm-md-codeblock-line': {
     backgroundColor: 'var(--editor-active-line)',
+  },
+  '.cm-md-highlight': {
+    backgroundColor: 'var(--editor-highlight-bg, #ffe066)',
+    color: 'var(--editor-highlight-fg, inherit)',
+    borderRadius: '2px',
+  },
+  '.cm-md-super': {
+    verticalAlign: 'super',
+    fontSize: 'smaller',
+  },
+  '.cm-md-sub': {
+    verticalAlign: 'sub',
+    fontSize: 'smaller',
+  },
+  '.cm-md-footnote-ref': {
+    verticalAlign: 'super',
+    fontSize: '0.75em',
+    color: 'var(--editor-link, #4ea1ff)',
+  },
+  '.cm-md-linkref-line': {
+    opacity: '0.6',
+  },
+  '.cm-md-footnote-def-line': {
+    opacity: '0.7',
+    fontSize: '0.92em',
   },
   '.cm-md-checkbox': {
     verticalAlign: 'middle',

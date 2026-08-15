@@ -19,6 +19,11 @@ export async function openFileDialog(): Promise<OpenedFile | null> {
   return { path, name: fileNameFromPath(path), content };
 }
 
+/** Shows the native open-file dialog and returns just the chosen path. Returns null if cancelled. */
+export async function pickPath(): Promise<string | null> {
+  return await open({ multiple: false });
+}
+
 /** Reads a file directly by path (e.g. re-opening a recent file), without showing a dialog. */
 export async function openPath(path: string): Promise<OpenedFile> {
   const content = await readTextFile(path);

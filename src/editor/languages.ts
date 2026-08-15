@@ -1,14 +1,32 @@
 import type { LanguageSupport } from '@codemirror/language';
-import { GFM } from '@lezer/markdown';
+import { GFM, Subscript, Superscript } from '@lezer/markdown';
+import {
+  footnoteExtension,
+  highlightExtension,
+  wikiLinkExtension,
+} from './mdExtensions';
 
-// ponytail: each loader is a separate dynamic import so Vite code-splits per
+// Each loader is a separate dynamic import so Vite code-splits per
 // language — CodeMirror's language packages (esp. python/javascript) were
 // the bulk of the old single 1.2MB bundle. Loaded lazily and cached below.
+const markdownExtensions = [
+  GFM,
+  Superscript,
+  Subscript,
+  highlightExtension,
+  wikiLinkExtension,
+  footnoteExtension,
+];
+
 const byExtension: Record<string, () => Promise<LanguageSupport>> = {
   md: async () =>
-    (await import('@codemirror/lang-markdown')).markdown({ extensions: GFM }),
+    (await import('@codemirror/lang-markdown')).markdown({
+      extensions: markdownExtensions,
+    }),
   markdown: async () =>
-    (await import('@codemirror/lang-markdown')).markdown({ extensions: GFM }),
+    (await import('@codemirror/lang-markdown')).markdown({
+      extensions: markdownExtensions,
+    }),
   json: async () => (await import('@codemirror/lang-json')).json(),
   jsonc: async () => (await import('@codemirror/lang-json')).json(),
   yaml: async () => (await import('@codemirror/lang-yaml')).yaml(),

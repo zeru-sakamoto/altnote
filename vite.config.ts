@@ -11,7 +11,7 @@ export default defineConfig(async () => ({
   test: {
     environment: 'node',
   },
-  // ponytail: local desktop app, not served over a network — chunk size warning is noise
+  // Local desktop app, not served over a network — chunk size warning is noise
   build: {
     chunkSizeWarningLimit: 1200,
   },

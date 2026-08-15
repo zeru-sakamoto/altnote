@@ -19,15 +19,19 @@ import { THEME_CSS_VAR_KEYS } from './theme/convert';
 import {
   askUnsavedChanges,
   fileNameFromPath,
-  openFileDialog,
+  pickPath,
   openPath,
   saveAsDialog,
   writeFile,
 } from './lib/file';
+import { createEditorWindow } from './lib/window';
 import { message } from '@tauri-apps/plugin-dialog';
 import styles from './App.module.css';
 
 const AUTO_SAVE_DELAY_MS = 1000;
+
+/** File path this window was opened with (OS "open with" / relaunch / another window's Open), if any. */
+const initialPath = new URLSearchParams(window.location.search).get('path');
 
 export default function App() {
   const settings = useSettings();
@@ -93,36 +97,38 @@ export default function App() {
     editorRef.current?.loadContent('');
   }
 
-  async function doOpen() {
-    if (!(await ensureSaved())) return;
-    const opened = await openFileDialog();
-    if (!opened) return;
-    setPath(opened.path);
-    setFileName(opened.name);
-    setDirty(false);
-    editorRef.current?.loadContent(opened.content);
-    addRecentFile(opened.path);
-  }
-
-  async function openRecent(recentPath: string) {
-    if (!(await ensureSaved())) return;
+  /** Loads `path` into *this* window — used for the window's initial file only. */
+  async function loadFile(loadPath: string) {
     try {
-      const opened = await openPath(recentPath);
+      const opened = await openPath(loadPath);
       setPath(opened.path);
       setFileName(opened.name);
       setDirty(false);
       editorRef.current?.loadContent(opened.content);
       addRecentFile(opened.path);
     } catch {
-      removeRecentFile(recentPath);
+      removeRecentFile(loadPath);
       await message(
-        `Couldn't open ${fileNameFromPath(recentPath)} — it may have been moved or deleted.`,
+        `Couldn't open ${fileNameFromPath(loadPath)} — it may have been moved or deleted.`,
         {
           title: 'File not found',
           kind: 'error',
         },
       );
     }
+  }
+
+  async function doOpen() {
+    const chosen = await pickPath();
+    if (chosen) createEditorWindow(chosen);
+  }
+
+  function openRecent(recentPath: string) {
+    createEditorWindow(recentPath);
+  }
+
+  function newWindow() {
+    createEditorWindow();
   }
 
   function toggleWrap() {
@@ -146,6 +152,7 @@ export default function App() {
   useEffect(() => {
     void initSettings().then(() => {
       setWrap(settings.wrap);
+      if (initialPath) void loadFile(initialPath);
     });
 
     function handleKeydown(e: KeyboardEvent) {
@@ -157,7 +164,10 @@ export default function App() {
       }
       if (!mod) return;
       const key = e.key.toLowerCase();
-      if (key === 'n') {
+      if (key === 'n' && e.shiftKey) {
+        e.preventDefault();
+        newWindow();
+      } else if (key === 'n') {
         e.preventDefault();
         void newFile();
       } else if (key === 'o') {
@@ -241,6 +251,7 @@ export default function App() {
           liveMarkdownPreview={settings.liveMarkdownPreview}
           showPreviewPane={showPreviewPane}
           onNew={() => void newFile()}
+          onNewWindow={newWindow}
           onOpen={() => void doOpen()}
           onSave={() => void performSave()}
           onSaveAs={() => void performSaveAs()}

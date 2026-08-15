@@ -9,6 +9,7 @@ interface Props {
   liveMarkdownPreview: boolean;
   showPreviewPane: boolean;
   onNew: () => void;
+  onNewWindow: () => void;
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
@@ -35,6 +36,7 @@ export default function Titlebar({
   liveMarkdownPreview,
   showPreviewPane,
   onNew,
+  onNewWindow,
   onOpen,
   onSave,
   onSaveAs,
@@ -81,6 +83,9 @@ export default function Titlebar({
           <div className={styles.menuDropdown}>
             <button onClick={() => run(onNew)}>
               New <span className={styles.hint}>{modLabel}N</span>
+            </button>
+            <button onClick={() => run(onNewWindow)}>
+              New Window <span className={styles.hint}>{modLabel}Shift+N</span>
             </button>
             <button onClick={() => run(onOpen)}>
               Open… <span className={styles.hint}>{modLabel}O</span>
