@@ -6,11 +6,16 @@
       {
         "rule": "side-tab",
         "value": "*",
-        "files": [
-          "src/components/PreviewPane.svelte"
-        ],
+        "files": ["src/components/PreviewPane.svelte"],
         "createdAt": "2026-08-14T18:25:58.010Z",
         "reason": "blockquote left-border is the standard/universal markdown-rendering convention (GitHub, GitLab, etc.), not a decorative card accent"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": ["src/components/PreviewPane.module.css"],
+        "createdAt": "2026-08-14T20:15:27.819Z",
+        "reason": "blockquote left-border is a standard markdown-quote convention, not a card accent; rule ported verbatim from the pre-existing Svelte component being migrated, unchanged in this session"
       }
     ]
   }

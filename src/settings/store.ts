@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { load, type Store } from '@tauri-apps/plugin-store';
 import type { VSCodeTheme } from '../theme/convert';
 
@@ -26,8 +27,31 @@ const MAX_RECENT = 8;
 const MAX_CUSTOM_THEMES = 10;
 
 let backingStore: Store | undefined;
+let state: Settings = { ...DEFAULTS };
+const listeners = new Set<() => void>();
 
-export const settings = $state<Settings>({ ...DEFAULTS });
+function notify() {
+  for (const listener of listeners) listener();
+}
+
+function setState(patch: Partial<Settings>) {
+  state = { ...state, ...patch };
+  notify();
+}
+
+export function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function getSettingsSnapshot(): Settings {
+  return state;
+}
+
+/** React hook for declarative consumers — re-renders on any settings change. */
+export function useSettings(): Settings {
+  return useSyncExternalStore(subscribe, getSettingsSnapshot);
+}
 
 export async function initSettings() {
   backingStore = await load('settings.json');
@@ -38,40 +62,42 @@ export async function initSettings() {
     backingStore.get<string | null>('themeId'),
     backingStore.get<CachedTheme[]>('customThemes'),
   ]);
-  if (font !== undefined) settings.font = font;
-  if (wrap !== undefined) settings.wrap = wrap;
-  if (recentFiles !== undefined) settings.recentFiles = recentFiles;
-  if (themeId !== undefined) settings.themeId = themeId;
-  if (customThemes !== undefined) settings.customThemes = customThemes;
+  const patch: Partial<Settings> = {};
+  if (font !== undefined) patch.font = font;
+  if (wrap !== undefined) patch.wrap = wrap;
+  if (recentFiles !== undefined) patch.recentFiles = recentFiles;
+  if (themeId !== undefined) patch.themeId = themeId;
+  if (customThemes !== undefined) patch.customThemes = customThemes;
+  setState(patch);
 }
 
 export function setFont(font: string | null) {
-  settings.font = font;
+  setState({ font });
   void backingStore?.set('font', font);
 }
 
 export function setWrapDefault(wrap: boolean) {
-  settings.wrap = wrap;
+  setState({ wrap });
   void backingStore?.set('wrap', wrap);
 }
 
 export function addRecentFile(path: string) {
-  const next = [path, ...settings.recentFiles.filter((p) => p !== path)].slice(
+  const next = [path, ...state.recentFiles.filter((p) => p !== path)].slice(
     0,
     MAX_RECENT,
   );
-  settings.recentFiles = next;
+  setState({ recentFiles: next });
   void backingStore?.set('recentFiles', next);
 }
 
 export function removeRecentFile(path: string) {
-  const next = settings.recentFiles.filter((p) => p !== path);
-  settings.recentFiles = next;
+  const next = state.recentFiles.filter((p) => p !== path);
+  setState({ recentFiles: next });
   void backingStore?.set('recentFiles', next);
 }
 
 export function setThemeId(themeId: string | null) {
-  settings.themeId = themeId;
+  setState({ themeId });
   void backingStore?.set('themeId', themeId);
 }
 
@@ -79,8 +105,8 @@ export function setThemeId(themeId: string | null) {
 export function cacheCustomTheme(cached: CachedTheme) {
   const next = [
     cached,
-    ...settings.customThemes.filter((c) => c.id !== cached.id),
+    ...state.customThemes.filter((c) => c.id !== cached.id),
   ].slice(0, MAX_CUSTOM_THEMES);
-  settings.customThemes = next;
+  setState({ customThemes: next });
   void backingStore?.set('customThemes', next);
 }

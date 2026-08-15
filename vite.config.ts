@@ -1,13 +1,13 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
+import react from '@vitejs/plugin-react-swc';
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [svelte()],
+  plugins: [react()],
   test: {
     environment: 'node',
   },

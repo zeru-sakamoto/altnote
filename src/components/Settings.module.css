@@ -1,0 +1,72 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.panel {
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  background-color: var(--editor-bg);
+  color: var(--editor-fg);
+  border: 1px solid var(--editor-active-line);
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.header h2 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.closeBtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.closeBtn:hover {
+  background-color: var(--editor-active-line);
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+
+.field select {
+  width: 100%;
+  padding: 6px 8px;
+  background-color: var(--editor-bg);
+  color: var(--editor-fg);
+  border: 1px solid var(--editor-active-line);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.sample {
+  margin: 10px 0 0;
+  font-size: 15px;
+  opacity: 0.85;
+}

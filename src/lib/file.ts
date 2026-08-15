@@ -50,7 +50,7 @@ export async function askUnsavedChanges(
       buttons: { yes: 'Save', no: "Don't Save", cancel: 'Cancel' },
     },
   );
-  if (result === 'Yes') return 'save';
-  if (result === 'No') return 'discard';
+  if (result === 'Save') return 'save';
+  if (result === "Don't Save") return 'discard';
   return 'cancel';
 }

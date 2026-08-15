@@ -1,0 +1,67 @@
+.field {
+  margin-top: 14px;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+
+.field select,
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 6px 8px;
+  background-color: var(--editor-bg);
+  color: var(--editor-fg);
+  border: 1px solid var(--editor-active-line);
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.field textarea {
+  resize: vertical;
+  font-family: var(--editor-font, ui-monospace, monospace);
+  margin: 8px 0;
+}
+
+.row {
+  display: flex;
+  gap: 6px;
+}
+
+.row input {
+  flex: 1;
+}
+
+.field button {
+  padding: 6px 10px;
+  background-color: var(--editor-active-line);
+  color: var(--editor-fg);
+  border: 1px solid var(--editor-active-line);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.field button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.field summary {
+  font-size: 12px;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #e05252;
+}

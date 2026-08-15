@@ -16,7 +16,9 @@ describe('convertTheme', () => {
 
   it('maps a tokenColors scope to the matching Lezer tag with its color', () => {
     const converted = convertTheme(dracula);
-    const commentSpec = converted.highlightStyle.specs.find((spec) => spec.tag === t.comment);
+    const commentSpec = converted.highlightStyle.specs.find(
+      (spec) => spec.tag === t.comment,
+    );
     expect(commentSpec?.color).toBe('#6272A4');
   });
 
