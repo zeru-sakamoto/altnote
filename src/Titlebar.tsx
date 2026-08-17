@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { IconMenu2, IconMinus, IconSquare, IconX } from '@tabler/icons-react';
 import styles from './Titlebar.module.css';
 
 interface Props {
@@ -69,15 +70,7 @@ export default function Titlebar({
     <div className={styles.titlebar}>
       <div className={styles.menu}>
         <button className={styles.menuButton} title="Menu" onClick={toggleMenu}>
-          <svg width="20" height="20" viewBox="0 0 16 16">
-            <path
-              d="M3 5h10M3 8h10M3 11h10"
-              stroke="currentColor"
-              strokeWidth="1.25"
-              fill="none"
-              strokeLinecap="round"
-            />
-          </svg>
+          <IconMenu2 size={18} stroke={1.75} />
         </button>
         {menuOpen && (
           <div className={styles.menuDropdown}>
@@ -146,44 +139,20 @@ export default function Titlebar({
       </div>
       <div className={styles.controls}>
         <button title="Minimize" onClick={() => getCurrentWindow().minimize()}>
-          <svg width="12" height="12" viewBox="0 0 12 12">
-            <path
-              d="M2 6h8"
-              stroke="currentColor"
-              strokeWidth="1"
-              fill="none"
-            />
-          </svg>
+          <IconMinus size={14} stroke={1.75} />
         </button>
         <button
           title="Maximize"
           onClick={() => getCurrentWindow().toggleMaximize()}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12">
-            <rect
-              x="2.5"
-              y="2.5"
-              width="7"
-              height="7"
-              stroke="currentColor"
-              strokeWidth="1"
-              fill="none"
-            />
-          </svg>
+          <IconSquare size={12} stroke={1.75} />
         </button>
         <button
           className={styles.close}
           title="Close"
           onClick={() => getCurrentWindow().close()}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12">
-            <path
-              d="M2 2l8 8M10 2l-8 8"
-              stroke="currentColor"
-              strokeWidth="1"
-              fill="none"
-            />
-          </svg>
+          <IconX size={14} stroke={1.75} />
         </button>
       </div>
     </div>

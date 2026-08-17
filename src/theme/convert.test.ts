@@ -41,6 +41,40 @@ describe('convertTheme', () => {
     );
   });
 
+  it('splits a comma-separated scope string into individual scopes', () => {
+    // Regression: VS Code themes commonly list several scopes as one
+    // comma-separated string (e.g. one-dark.json's `entity.name.type.module.js,
+    // entity.name.type.module.ts`) rather than an array. Matching against the
+    // unsplit string never hits a SCOPE_MAP prefix, so the rule's color was
+    // silently dropped.
+    const converted = convertTheme({
+      name: 'Comma',
+      tokenColors: [
+        {
+          scope: 'nonsense.scope, storage.type',
+          settings: { foreground: '#ff00ff' },
+        },
+      ],
+    });
+    const typeSpec = converted.highlightStyle.specs.find(
+      (spec) => spec.tag === t.typeName,
+    );
+    expect(typeSpec?.color).toBe('#ff00ff');
+  });
+
+  it("maps Tokyo Night's compound heading.N.markdown scope to the right heading tag", () => {
+    // Regression: Tokyo Night styles headings via a two-part compound scope
+    // like `"heading.1.markdown entity.name"` rather than `markup.heading`.
+    // The unsplit-on-space compound never matched `markup.heading`'s dotted
+    // prefix check, so headings stayed uncolored in that theme specifically.
+    const tokyoNight = presetThemes.find((p) => p.id === 'tokyo-night')!.theme;
+    const converted = convertTheme(tokyoNight);
+    const heading1Spec = converted.highlightStyle.specs.find(
+      (spec) => spec.tag === t.heading1,
+    );
+    expect(heading1Spec?.color).toBe('#89ddff');
+  });
+
   it('derives the active-line color from the foreground at a low, consistent alpha', () => {
     // Dracula's own editor.lineHighlightBackground is unset; regardless, this app always
     // computes its own low-alpha neutral tint rather than trusting a theme's raw value

@@ -1,10 +1,17 @@
 import { syntaxTree } from '@codemirror/language';
-import type { Range } from '@codemirror/state';
+import {
+  RangeSet,
+  StateField,
+  type EditorState,
+  type Range,
+} from '@codemirror/state';
 import {
   Decoration,
   EditorView,
+  GutterMarker,
   ViewPlugin,
   WidgetType,
+  gutterLineClass,
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view';
@@ -160,18 +167,12 @@ function buildDecorations(view: EditorView): DecorationSet {
           return;
         }
 
-        // Tables always render as the interactive widget — there's no raw-text edit
-        // fallback, since editing happens through the widget's own cells instead.
-        if (type === 'Table') {
-          const model = parseTableModel(view.state.doc, node.node);
-          ranges.push(
-            Decoration.replace({
-              widget: new TableWidget(model, node.from, node.to),
-              block: true,
-            }).range(node.from, node.to),
-          );
-          return false;
-        }
+        // Tables are handled by `tableField` below, not here — CodeMirror doesn't
+        // allow block decorations (the table widget replaces the whole node,
+        // spanning multiple lines) to be contributed by a ViewPlugin, only by a
+        // StateField. Skip descending into it so its inner marks/marks-of-marks
+        // (e.g. `**bold**` inside a cell) don't also get decorated here.
+        if (type === 'Table') return false;
 
         // Images render inline unless the cursor is on that line, in which case they
         // fall through to the same Link-style raw-markup handling below.
@@ -315,6 +316,77 @@ function buildDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true);
 }
 
+/** Tables always render as the interactive widget — there's no raw-text edit
+ * fallback, since editing happens through the widget's own cells instead.
+ * Walks the whole document (not just `view.visibleRanges`) since a StateField
+ * has no notion of viewport; fine in practice since tables are sparse
+ * compared to the per-character mark decorations above. */
+function buildTableDecorations(state: EditorState): DecorationSet {
+  const ranges: Range<Decoration>[] = [];
+  syntaxTree(state).iterate({
+    enter: (node) => {
+      if (node.type.name === 'Table') {
+        const model = parseTableModel(state.doc, node.node);
+        ranges.push(
+          Decoration.replace({
+            widget: new TableWidget(model, node.from, node.to),
+            block: true,
+          }).range(node.from, node.to),
+        );
+        return false;
+      }
+    },
+  });
+  return Decoration.set(ranges);
+}
+
+/** Marks each heading line's gutter element so its line number can be
+ * vertically centered against the enlarged heading text — plain (non-heading)
+ * lines must stay top-aligned, since centering a wrapped line's number
+ * against its whole multi-row block (instead of just its first row) is the
+ * bug this exists to avoid. */
+const headingGutterMarker = new (class extends GutterMarker {
+  elementClass = 'cm-md-h-gutter';
+})();
+
+function buildHeadingGutterMarkers(state: EditorState) {
+  const markers: Range<GutterMarker>[] = [];
+  syntaxTree(state).iterate({
+    enter: (node) => {
+      if (HEADING[node.type.name]) {
+        markers.push(
+          headingGutterMarker.range(state.doc.lineAt(node.from).from),
+        );
+      }
+    },
+  });
+  return RangeSet.of(markers, true);
+}
+
+export const headingGutterField = StateField.define({
+  create: buildHeadingGutterMarkers,
+  update(value, tr) {
+    return tr.docChanged || syntaxTree(tr.startState) !== syntaxTree(tr.state)
+      ? buildHeadingGutterMarkers(tr.state)
+      : value;
+  },
+  provide: (f) => gutterLineClass.from(f),
+});
+
+export const tableField = StateField.define<DecorationSet>({
+  create: buildTableDecorations,
+  update(value, tr) {
+    // Language attaches asynchronously (see Editor.tsx), so the syntax tree
+    // can go from empty to fully parsed on a transaction that isn't a doc
+    // change (a compartment reconfigure) — rebuild for that case too, or
+    // tables stay raw text until the user's first edit.
+    return tr.docChanged || syntaxTree(tr.startState) !== syntaxTree(tr.state)
+      ? buildTableDecorations(tr.state)
+      : value;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
 export const livePreviewPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
@@ -420,53 +492,155 @@ export const livePreviewTheme = EditorView.baseTheme({
     padding: '4px 8px',
   },
   '.cm-md-table-wrap': {
-    margin: '4px 0',
+    position: 'relative',
+    padding: '4px 0',
   },
   '.cm-md-table': {
     borderCollapse: 'collapse',
     fontSize: '13px',
   },
-  '.cm-md-table-controls th': {
-    border: 'none',
-    padding: '0 4px',
-    textAlign: 'center',
-  },
   '.cm-md-table-cell': {
     border: '1px solid var(--editor-active-line)',
-    padding: '4px 8px',
+    padding: '0',
     minWidth: '3em',
+  },
+  '.cm-md-table-cell-editable': {
+    padding: '4px 8px',
     outline: 'none',
   },
-  '.cm-md-table-cell:focus': {
+  '.cm-md-table-cell-editable:focus': {
     outline: '1px solid var(--editor-link, #4ea1ff)',
+    outlineOffset: '-1px',
   },
-  '.cm-md-table-row-action': {
+  '.cm-md-table-header-cell': {
+    position: 'relative',
+  },
+  '.cm-md-table-row-handle': {
+    position: 'relative',
     border: 'none',
-    padding: '0 4px',
+    padding: '0',
+    width: '22px',
     textAlign: 'center',
   },
-  '.cm-md-table-btn': {
+  '.cm-md-table-menu-icon': {
     appearance: 'none',
     border: 'none',
     background: 'transparent',
     color: 'inherit',
-    opacity: '0.55',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '15px',
     lineHeight: '1',
-    padding: '2px 4px',
+    padding: '3px',
     borderRadius: '3px',
+    opacity: '0',
   },
-  '.cm-md-table-btn:hover:not(:disabled)': {
-    opacity: '1',
+  '.cm-md-table-header-cell .cm-md-table-menu-icon': {
+    position: 'absolute',
+    top: '-15px',
+    left: '50%',
+    transform: 'translateX(-50%) rotate(90deg)',
+  },
+  '.cm-md-table-header-cell:hover .cm-md-table-menu-icon, .cm-md-table-row-handle:hover .cm-md-table-menu-icon, .cm-md-table-menu-icon:focus-visible':
+    {
+      opacity: '1',
+    },
+  '.cm-md-table-menu-icon:hover': {
     backgroundColor: 'var(--editor-active-line)',
   },
-  '.cm-md-table-btn:disabled': {
-    opacity: '0.2',
+  '.cm-md-table-popover': {
+    position: 'absolute',
+    top: '100%',
+    zIndex: '10',
+    marginTop: '2px',
+    minWidth: '150px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1px',
+    padding: '4px',
+    borderRadius: '6px',
+    border: '1px solid var(--editor-active-line)',
+    background: 'var(--editor-bg, #1e1e1e)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+  },
+  '.cm-md-table-popover-col': { right: '0' },
+  '.cm-md-table-popover-row': { left: '0' },
+  '.cm-md-table-menu-align-row': {
+    display: 'flex',
+    gap: '2px',
+    marginBottom: '2px',
+  },
+  '.cm-md-table-menu-align-row .cm-md-table-menu-item': {
+    flex: '1',
+    justifyContent: 'center',
+  },
+  '.cm-md-table-menu-item': {
+    appearance: 'none',
+    border: 'none',
+    background: 'transparent',
+    color: 'inherit',
+    cursor: 'pointer',
+    fontSize: '13px',
+    textAlign: 'left',
+    padding: '6px 8px',
+    borderRadius: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  '.cm-md-table-menu-icon-svg': {
+    display: 'inline-flex',
+    flexShrink: '0',
+  },
+  '.cm-md-table-menu-item:hover:not(:disabled)': {
+    backgroundColor: 'var(--editor-active-line)',
+  },
+  '.cm-md-table-menu-item:disabled': {
+    opacity: '0.3',
     cursor: 'default',
   },
-  '.cm-md-table-actions': {
-    marginTop: '2px',
+  '.cm-md-table-menu-item-active': {
+    backgroundColor: 'var(--editor-active-line)',
+    fontWeight: 'bold',
+  },
+  '.cm-md-table-menu-item-destructive': {
+    color: '#e5534b',
+  },
+  '.cm-md-table-menu-divider': {
+    height: '1px',
+    margin: '2px 0',
+    background: 'var(--editor-active-line)',
+  },
+  '.cm-md-table-dragging': { cursor: 'grabbing' },
+  // A single absolutely-positioned overlay sized to the hovered group's
+  // bounding box (see `fitOverlayToRect` in liveTable.ts) — for a column
+  // drag that spans the th + every td below it, so the border traces the
+  // whole column's outer edge instead of each cell drawing its own border
+  // and leaving seams at row boundaries.
+  '.cm-md-table-drop-target': {
+    position: 'absolute',
+    zIndex: '5',
+    border: '2px solid var(--editor-link, #4ea1ff)',
+    borderRadius: '2px',
+    pointerEvents: 'none',
+    boxSizing: 'border-box',
+  },
+  // While dragging, cells not being dragged animate into their preview slot
+  // (liveTable.ts sets their transform) — give that a transition. The
+  // dragged group's own cells override it back to none below, since those
+  // follow the pointer directly and must not lag.
+  '.cm-md-table-dragging .cm-md-table-cell, .cm-md-table-dragging tbody tr': {
+    transition: 'transform 120ms ease',
+  },
+  // Applied to the dragged row/column's own cells while a drag is in
+  // progress — they follow the pointer via an inline transform (liveTable.ts),
+  // this just lifts them visually above the rest of the table.
+  '.cm-md-table-drag-source': {
+    position: 'relative',
+    zIndex: '4',
+    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.35)',
+  },
+  '.cm-md-table-dragging .cm-md-table-drag-source': {
+    transition: 'none',
   },
   '.cm-md-h': { fontWeight: 'bold' },
   '.cm-md-h1': { fontSize: '1.6em' },
@@ -477,4 +651,9 @@ export const livePreviewTheme = EditorView.baseTheme({
   '.cm-md-h6': { fontSize: '1em' },
 });
 
-export const livePreview = [livePreviewPlugin, livePreviewTheme];
+export const livePreview = [
+  livePreviewPlugin,
+  tableField,
+  headingGutterField,
+  livePreviewTheme,
+];

@@ -1,7 +1,8 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.35);
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -16,20 +17,26 @@
   background-color: var(--editor-bg);
   color: var(--editor-fg);
   border: 1px solid var(--editor-active-line);
-  border-radius: 6px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-  padding: 16px;
+  border-radius: 10px;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+  padding: 18px 20px 20px;
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin: -2px -2px 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--editor-active-line);
 }
 
 .header h2 {
   font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
   margin: 0;
 }
 
@@ -39,41 +46,144 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  opacity: 0.7;
+  transition:
+    background-color 120ms ease,
+    opacity 120ms ease;
 }
 
 .closeBtn:hover {
   background-color: var(--editor-active-line);
+  opacity: 1;
+}
+
+.field {
+  margin-top: 16px;
+}
+
+.field:first-of-type {
+  margin-top: 0;
 }
 
 .field label {
   display: block;
   font-size: 12px;
+  font-weight: 500;
   opacity: 0.7;
   margin-bottom: 6px;
 }
 
-.field .checkboxLabel {
+.switchLabel {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 0;
+  font-size: 13px;
+  opacity: 0.9;
+  cursor: pointer;
 }
 
-.field select {
+.switchInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switchTrack {
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background-color: var(--editor-active-line);
+  border: 1px solid var(--editor-active-line);
+  transition: background-color 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  box-sizing: border-box;
+}
+
+.switchThumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--editor-fg);
+  opacity: 0.6;
+  transition:
+    transform 120ms ease,
+    opacity 120ms ease;
+}
+
+.switchInput:checked ~ .switchTrack {
+  background-color: var(--editor-selection, #4a90d9);
+  border-color: var(--editor-selection, #4a90d9);
+}
+
+.switchInput:checked ~ .switchTrack .switchThumb {
+  transform: translateX(16px);
+  opacity: 1;
+}
+
+.switchInput:focus-visible ~ .switchTrack {
+  border-color: var(--editor-fg);
+}
+
+.field select,
+.field input[type='number'] {
   width: 100%;
-  padding: 6px 8px;
+  padding: 7px 8px;
   background-color: var(--editor-bg);
   color: var(--editor-fg);
   border: 1px solid var(--editor-active-line);
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 13px;
+  font-family: inherit;
+  transition: border-color 120ms ease;
+}
+
+.field select:hover,
+.field input[type='number']:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--editor-fg) 35%,
+    var(--editor-active-line)
+  );
+}
+
+.field select:focus-visible,
+.field input[type='number']:focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--editor-fg) 55%,
+    var(--editor-active-line)
+  );
+}
+
+.field select {
+  appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px 6px;
 }
 
 .sample {
   margin: 10px 0 0;
-  font-size: 15px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background-color: var(--editor-active-line);
+  font-size: 14px;
   opacity: 0.85;
+}
+
+*:focus,
+*:focus-visible {
+  outline: none;
 }

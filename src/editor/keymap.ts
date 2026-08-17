@@ -108,6 +108,36 @@ export function wrapSelectionSpec(
 ) {
   return state.changeByRange((range) => {
     if (range.empty) {
+      // Empty wrap under the cursor (e.g. `**|**`) toggled with the same
+      // shortcut removes it, rather than nesting another empty pair — checked
+      // by raw text since an empty span like `****` never resolves to a
+      // syntax-tree node worth asking about.
+      const beforeFrom = Math.max(0, range.from - open.length);
+      const afterTo = Math.min(state.doc.length, range.to + close.length);
+      // Also require the char just outside each marker to differ from the
+      // marker's own edge char, so `*` (italic) doesn't misread itself as
+      // matching inside a longer `**`/`***` run (e.g. bold's empty `**|**`) —
+      // that would strip one asterisk of the *wrong* marker instead of
+      // nesting italic around it.
+      const openOuter = state.sliceDoc(Math.max(0, beforeFrom - 1), beforeFrom);
+      const closeOuter = state.sliceDoc(
+        afterTo,
+        Math.min(state.doc.length, afterTo + 1),
+      );
+      if (
+        state.sliceDoc(beforeFrom, range.from) === open &&
+        state.sliceDoc(range.to, afterTo) === close &&
+        openOuter !== open[0] &&
+        closeOuter !== close[close.length - 1]
+      ) {
+        return {
+          changes: [
+            { from: beforeFrom, to: range.from, insert: '' },
+            { from: range.to, to: afterTo, insert: '' },
+          ],
+          range: EditorSelection.cursor(beforeFrom),
+        };
+      }
       return {
         changes: { from: range.from, insert: open + close },
         range: EditorSelection.cursor(range.from + open.length),
@@ -215,7 +245,59 @@ export function toggleWrap(
   };
 }
 
+const TAB_OUT_NODES: WrapNodeInfo[] = [
+  { node: 'StrongEmphasis', mark: 'EmphasisMark' },
+  { node: 'Emphasis', mark: 'EmphasisMark' },
+  { node: 'Strikethrough', mark: 'StrikethroughMark' },
+];
+
+/** If `pos` sits inside a bold/italic/strikethrough/underline span, returns the
+ * position just past its closing marker (so Tab can jump the caret out to the
+ * right instead of indenting). Underline has no syntax-tree node (raw `<u>`
+ * HTML), so it's found by scanning the current line's text instead. */
+export function tabOutOfWrapTarget(
+  state: EditorState,
+  pos: number,
+): number | null {
+  for (const info of TAB_OUT_NODES) {
+    const enclosing = findEnclosingMarkedNode(state, pos, pos, info);
+    if (enclosing) return enclosing.closeTo;
+  }
+
+  const line = state.doc.lineAt(pos);
+  const relPos = pos - line.from;
+  const lineText = line.text;
+  const openIdx = lineText.lastIndexOf('<u>', relPos);
+  const closeIdx = lineText.indexOf('</u>', relPos);
+  if (
+    openIdx !== -1 &&
+    closeIdx !== -1 &&
+    openIdx + 3 <= relPos &&
+    !lineText.slice(openIdx + 3, relPos).includes('</u>')
+  ) {
+    return line.from + closeIdx + 4;
+  }
+
+  return null;
+}
+
+/** Tab, when the caret is inside a formatting span, jumps it past the closing
+ * marker instead of indenting. Falls through to normal Tab handling
+ * otherwise. */
+function tabOutOfWrap(view: EditorView): boolean {
+  const { main } = view.state.selection;
+  if (!main.empty) return false;
+  const target = tabOutOfWrapTarget(view.state, main.head);
+  if (target === null) return false;
+  view.dispatch({
+    selection: EditorSelection.cursor(target),
+    scrollIntoView: true,
+  });
+  return true;
+}
+
 const vsCodeBindings: readonly KeyBinding[] = [
+  { key: 'Tab', run: tabOutOfWrap },
   { key: 'Mod-Enter', run: insertLineBelow },
   { key: 'Mod-Shift-Enter', run: insertLineAbove },
   { key: 'Mod-d', run: copyLineDown },

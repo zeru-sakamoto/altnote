@@ -124,6 +124,10 @@ export default function App() {
   }
 
   function openRecent(recentPath: string) {
+    if (showWelcome) {
+      void loadFile(recentPath);
+      return;
+    }
     createEditorWindow(recentPath);
   }
 
@@ -232,6 +236,15 @@ export default function App() {
   }, [settings.font]);
 
   useEffect(() => {
+    const root = document.documentElement.style;
+    if (settings.fontSize) {
+      root.setProperty('--editor-font-size', `${settings.fontSize}px`);
+    } else {
+      root.removeProperty('--editor-font-size');
+    }
+  }, [settings.fontSize]);
+
+  useEffect(() => {
     const theme = getActiveTheme();
     const root = document.documentElement.style;
     for (const key of THEME_CSS_VAR_KEYS) root.removeProperty(key);
@@ -270,6 +283,7 @@ export default function App() {
               filePath={path}
               wrap={wrap}
               liveMarkdownPreview={settings.liveMarkdownPreview}
+              lineNumbers={settings.lineNumbers}
               initialContent=""
               onChange={(text, isUserEdit) => {
                 setDocText(text);

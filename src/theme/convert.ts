@@ -41,6 +41,10 @@ export const THEME_CSS_VAR_KEYS = [
   '--titlebar-bg',
   '--titlebar-fg',
   '--editor-link',
+  '--editor-heading-fg',
+  '--editor-bold-fg',
+  '--editor-italic-fg',
+  '--editor-quote-fg',
 ] as const;
 
 /**
@@ -85,12 +89,27 @@ const SCOPE_MAP: Array<[string, Tag | Tag[]]> = [
   ['markup.quote', t.quote],
   ['markup.inserted', t.inserted],
   ['markup.deleted', t.deleted],
+  // Some themes (e.g. Tokyo Night) style markdown headings via this
+  // convention instead of `markup.heading`, as a two-part compound scope
+  // like `"heading.1.markdown entity.name"` — matched below via the
+  // space-separated prefix check, not `markup.heading`'s dotted one.
+  ['heading.1.markdown', t.heading1],
+  ['heading.2.markdown', t.heading2],
+  ['heading.3.markdown', t.heading3],
+  ['heading.4.markdown', t.heading4],
+  ['heading.5.markdown', t.heading5],
+  ['heading.6.markdown', t.heading6],
 ];
 
 function findTagFor(scopes: string[]): Tag | Tag[] | undefined {
   for (const scope of scopes) {
     for (const [prefix, tag] of SCOPE_MAP) {
-      if (scope === prefix || scope.startsWith(prefix + '.')) return tag;
+      if (
+        scope === prefix ||
+        scope.startsWith(prefix + '.') ||
+        scope.startsWith(prefix + ' ')
+      )
+        return tag;
     }
   }
   return undefined;
@@ -157,10 +176,16 @@ export function convertTheme(theme: VSCodeTheme): ConvertedTheme {
   }> = [];
 
   for (const entry of theme.tokenColors ?? []) {
+    // A single `scope` string may itself be a comma-separated list (VS Code's
+    // TextMate scope selector syntax, e.g. `"entity.name.type.module.js,
+    // entity.name.type.module.ts"`) — split it, or matching against the
+    // combined string never hits a SCOPE_MAP prefix and the rule's color is
+    // silently dropped, which is why some themes barely changed the editor's
+    // syntax colors at all.
     const scopes = Array.isArray(entry.scope)
       ? entry.scope
       : entry.scope
-        ? [entry.scope]
+        ? entry.scope.split(',').map((s) => s.trim())
         : [];
     if (scopes.length === 0 || !entry.settings.foreground) continue;
     const tag = findTagFor(scopes);
@@ -173,6 +198,10 @@ export function convertTheme(theme: VSCodeTheme): ConvertedTheme {
   }
 
   const highlightStyle = HighlightStyle.define(specs);
+  // Same scope->color data CodeMirror's HighlightStyle uses, re-exposed as CSS vars so
+  // the plain-HTML PreviewPane (which has no Lezer tags to match against) can mirror the
+  // editor's markdown syntax colors instead of rendering headings/bold/italic in flat body text.
+  const colorForTag = (tag: Tag) => specs.find((s) => s.tag === tag)?.color;
 
   const dark = theme.type !== 'light';
   const colors = theme.colors ?? {};
@@ -181,11 +210,12 @@ export function convertTheme(theme: VSCodeTheme): ConvertedTheme {
   const editorFg =
     colors['editor.foreground'] ?? (dark ? '#d4d4d4' : '#1a1a1a');
   const editorLink = colors['textLink.foreground'] ?? '#4ea1ff';
+  const gutterFg = colors['editorLineNumber.foreground'] ?? editorFg;
 
   const cssVars: Record<string, string> = {
     '--editor-bg': editorBg,
     '--editor-fg': editorFg,
-    '--editor-gutter-fg': colors['editorLineNumber.foreground'] ?? editorFg,
+    '--editor-gutter-fg': gutterFg,
     '--editor-active-line': activeLineColorFrom(editorFg),
     '--editor-selection': selectionColorFrom(editorLink),
     '--titlebar-bg':
@@ -194,6 +224,11 @@ export function convertTheme(theme: VSCodeTheme): ConvertedTheme {
       editorBg,
     '--titlebar-fg': colors['titleBar.activeForeground'] ?? editorFg,
     '--editor-link': editorLink,
+    '--editor-heading-fg':
+      colorForTag(t.heading1) ?? colorForTag(t.heading) ?? editorFg,
+    '--editor-bold-fg': colorForTag(t.strong) ?? editorFg,
+    '--editor-italic-fg': colorForTag(t.emphasis) ?? editorFg,
+    '--editor-quote-fg': colorForTag(t.quote) ?? gutterFg,
   };
 
   return { name: theme.name ?? 'Custom Theme', dark, highlightStyle, cssVars };

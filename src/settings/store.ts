@@ -10,22 +10,26 @@ export interface CachedTheme {
 
 export interface Settings {
   font: string | null;
+  fontSize: number | null;
   wrap: boolean;
   recentFiles: string[];
   themeId: string | null;
   customThemes: CachedTheme[];
   liveMarkdownPreview: boolean;
   autoSave: boolean;
+  lineNumbers: boolean;
 }
 
 const DEFAULTS: Settings = {
   font: null,
+  fontSize: null,
   wrap: true,
   recentFiles: [],
   themeId: null,
   customThemes: [],
   liveMarkdownPreview: true,
   autoSave: false,
+  lineNumbers: true,
 };
 const MAX_RECENT = 8;
 const MAX_CUSTOM_THEMES = 10;
@@ -61,23 +65,28 @@ export async function initSettings() {
   backingStore = await load('settings.json');
   const [
     font,
+    fontSize,
     wrap,
     recentFiles,
     themeId,
     customThemes,
     liveMarkdownPreview,
     autoSave,
+    lineNumbers,
   ] = await Promise.all([
     backingStore.get<string | null>('font'),
+    backingStore.get<number | null>('fontSize'),
     backingStore.get<boolean>('wrap'),
     backingStore.get<string[]>('recentFiles'),
     backingStore.get<string | null>('themeId'),
     backingStore.get<CachedTheme[]>('customThemes'),
     backingStore.get<boolean>('liveMarkdownPreview'),
     backingStore.get<boolean>('autoSave'),
+    backingStore.get<boolean>('lineNumbers'),
   ]);
   const patch: Partial<Settings> = {};
   if (font !== undefined) patch.font = font;
+  if (fontSize !== undefined) patch.fontSize = fontSize;
   if (wrap !== undefined) patch.wrap = wrap;
   if (recentFiles !== undefined) patch.recentFiles = recentFiles;
   if (themeId !== undefined) patch.themeId = themeId;
@@ -85,12 +94,18 @@ export async function initSettings() {
   if (liveMarkdownPreview !== undefined)
     patch.liveMarkdownPreview = liveMarkdownPreview;
   if (autoSave !== undefined) patch.autoSave = autoSave;
+  if (lineNumbers !== undefined) patch.lineNumbers = lineNumbers;
   setState(patch);
 }
 
 export function setFont(font: string | null) {
   setState({ font });
   void backingStore?.set('font', font);
+}
+
+export function setFontSize(fontSize: number | null) {
+  setState({ fontSize });
+  void backingStore?.set('fontSize', fontSize);
 }
 
 export function setWrapDefault(wrap: boolean) {
@@ -106,6 +121,11 @@ export function setLiveMarkdownPreview(liveMarkdownPreview: boolean) {
 export function setAutoSave(autoSave: boolean) {
   setState({ autoSave });
   void backingStore?.set('autoSave', autoSave);
+}
+
+export function setLineNumbers(lineNumbers: boolean) {
+  setState({ lineNumbers });
+  void backingStore?.set('lineNumbers', lineNumbers);
 }
 
 export function addRecentFile(path: string) {

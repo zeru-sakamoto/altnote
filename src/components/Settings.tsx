@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useSettings, setFont, setAutoSave } from '../settings/store';
+import {
+  useSettings,
+  setFont,
+  setFontSize,
+  setAutoSave,
+  setLineNumbers,
+} from '../settings/store';
 import ThemePicker from './ThemePicker';
 import styles from './Settings.module.css';
 
@@ -93,14 +99,49 @@ export default function Settings({ onClose }: Props) {
         </div>
 
         <div className={styles.field}>
-          <label htmlFor="autosave-toggle" className={styles.checkboxLabel}>
+          <label htmlFor="fontsize-input">Font Size</label>
+          <input
+            id="fontsize-input"
+            type="number"
+            min={8}
+            max={40}
+            value={settings.fontSize ?? 14}
+            onChange={(e) => {
+              const value = Number(e.currentTarget.value);
+              setFontSize(Number.isFinite(value) && value > 0 ? value : null);
+            }}
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="autosave-toggle" className={styles.switchLabel}>
+            <span>Auto Save (saves ~1s after you stop typing)</span>
             <input
               id="autosave-toggle"
               type="checkbox"
+              className={styles.switchInput}
               checked={settings.autoSave}
               onChange={(e) => setAutoSave(e.currentTarget.checked)}
             />
-            Auto Save (saves ~1s after you stop typing)
+            <span className={styles.switchTrack}>
+              <span className={styles.switchThumb} />
+            </span>
+          </label>
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="linenumbers-toggle" className={styles.switchLabel}>
+            <span>Line Numbers</span>
+            <input
+              id="linenumbers-toggle"
+              type="checkbox"
+              className={styles.switchInput}
+              checked={settings.lineNumbers}
+              onChange={(e) => setLineNumbers(e.currentTarget.checked)}
+            />
+            <span className={styles.switchTrack}>
+              <span className={styles.switchThumb} />
+            </span>
           </label>
         </div>
 

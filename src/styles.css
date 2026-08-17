@@ -11,6 +11,7 @@ body,
 
 :root {
   --editor-font: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --editor-font-size: 14px;
 
   --titlebar-bg: #f3f3f3;
   --titlebar-fg: #3a3a3a;

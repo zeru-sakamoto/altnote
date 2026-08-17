@@ -22,6 +22,7 @@ interface Props {
   filePath: string | null;
   wrap: boolean;
   liveMarkdownPreview: boolean;
+  lineNumbers: boolean;
   initialContent?: string;
   /** Called on every doc change. `isUserEdit` is false for programmatic loads (opening/new file). */
   onChange?: (content: string, isUserEdit: boolean) => void;
@@ -35,6 +36,12 @@ function slashCommandsExtension(fileName: string) {
   return isMarkdownFile(fileName) ? [slashCommands] : [];
 }
 
+function lineNumbersExtension(show: boolean) {
+  return show
+    ? []
+    : EditorView.theme({ '.cm-lineNumbers': { display: 'none' } });
+}
+
 function themeExtension() {
   const theme = getActiveTheme();
   return theme ? syntaxHighlighting(theme.highlightStyle) : [];
@@ -43,7 +50,7 @@ function themeExtension() {
 const editorTheme = EditorView.theme({
   '&': {
     height: '100%',
-    fontSize: '14px',
+    fontSize: 'var(--editor-font-size, 14px)',
     backgroundColor: 'var(--editor-bg)',
     color: 'var(--editor-fg)',
   },
@@ -58,6 +65,19 @@ const editorTheme = EditorView.theme({
     backgroundColor: 'var(--editor-bg)',
     color: 'var(--editor-gutter-fg)',
     border: 'none',
+  },
+  // A wrapped line's gutter element spans every visual row it wraps to, so it
+  // must stay top-aligned — the number belongs on the line's first row, not
+  // centered across the whole wrapped block. Heading lines are the one
+  // exception: they're taller than base line-height for a different reason
+  // (their `.cm-md-h*` text is scaled up via `em`, not wrapped), so their
+  // number is explicitly centered via `cm-md-h-gutter` (see livePreview.ts).
+  '.cm-lineNumbers .cm-gutterElement': {
+    display: 'flex',
+    alignItems: 'flex-start',
+  },
+  '.cm-lineNumbers .cm-gutterElement.cm-md-h-gutter': {
+    alignItems: 'center',
   },
   '.cm-activeLine': { backgroundColor: 'var(--editor-active-line)' },
   '.cm-activeLineGutter': { backgroundColor: 'var(--editor-active-line)' },
@@ -92,6 +112,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     filePath,
     wrap,
     liveMarkdownPreview,
+    lineNumbers,
     initialContent = '',
     onChange,
   },
@@ -109,6 +130,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     slashCommands: new Compartment(),
     theme: new Compartment(),
     filePath: new Compartment(),
+    lineNumbers: new Compartment(),
   }).current;
 
   useImperativeHandle(
@@ -147,6 +169,7 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         compartments.slashCommands.of(slashCommandsExtension(fileName)),
         compartments.theme.of(themeExtension()),
         compartments.filePath.of(currentFilePath.of(filePath)),
+        compartments.lineNumbers.of(lineNumbersExtension(lineNumbers)),
         EditorView.updateListener.of((update) => {
           if (!update.docChanged) return;
           const isLoad = update.transactions.some((tr) =>
@@ -212,6 +235,14 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       effects: compartments.filePath.reconfigure(currentFilePath.of(filePath)),
     });
   }, [filePath]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: compartments.lineNumbers.reconfigure(
+        lineNumbersExtension(lineNumbers),
+      ),
+    });
+  }, [lineNumbers]);
 
   // Editor has no theme prop — theme changes originate in Settings/ThemePicker, so this
   // subscribes directly to the settings store rather than depending on props. The store
