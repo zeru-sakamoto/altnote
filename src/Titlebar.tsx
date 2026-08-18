@@ -1,4 +1,11 @@
-import { useEffect, useState } from 'react';
+import {
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItemCheckbox,
+  MenuSeparator,
+  useMenuStore,
+} from '@ariakit/react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { IconMenu2, IconMinus, IconSquare, IconX } from '@tabler/icons-react';
 import styles from './Titlebar.module.css';
@@ -48,89 +55,81 @@ export default function Titlebar({
   recentFiles,
   onOpenRecent,
 }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const closeMenu = () => setMenuOpen(false);
-    document.addEventListener('click', closeMenu);
-    return () => document.removeEventListener('click', closeMenu);
-  }, []);
-
-  function toggleMenu(e: React.MouseEvent) {
-    e.stopPropagation();
-    setMenuOpen((open) => !open);
-  }
+  const menu = useMenuStore();
 
   function run(action: () => void) {
     action();
-    setMenuOpen(false);
+    menu.hide();
   }
 
   return (
     <div className={styles.titlebar}>
       <div className={styles.menu}>
-        <button className={styles.menuButton} title="Menu" onClick={toggleMenu}>
+        <MenuButton store={menu} className={styles.menuButton} title="Menu">
           <IconMenu2 size={18} stroke={1.75} />
-        </button>
-        {menuOpen && (
-          <div className={styles.menuDropdown}>
-            <button onClick={() => run(onNew)}>
-              New <span className={styles.hint}>{modLabel}N</span>
-            </button>
-            <button onClick={() => run(onNewWindow)}>
-              New Window <span className={styles.hint}>{modLabel}Shift+N</span>
-            </button>
-            <button onClick={() => run(onOpen)}>
-              Open… <span className={styles.hint}>{modLabel}O</span>
-            </button>
-            {recentFiles.length > 0 && (
-              <>
-                <p className={styles.sectionLabel}>Recent</p>
-                {recentFiles.slice(0, 5).map((path) => (
-                  <button
-                    key={path}
-                    className={styles.recentItem}
-                    title={path}
-                    onClick={() => run(() => onOpenRecent(path))}
-                  >
-                    {baseName(path)}
-                  </button>
-                ))}
-                <div className={styles.separator}></div>
-              </>
-            )}
-            <button onClick={() => run(onSave)}>
-              Save <span className={styles.hint}>{modLabel}S</span>
-            </button>
-            <button onClick={() => run(onSaveAs)}>
-              Save As… <span className={styles.hint}>{modLabel}Shift+S</span>
-            </button>
-            <div className={styles.separator}></div>
-            <button onClick={() => run(onToggleWrap)}>
-              <span className={styles.check}>{wrap ? '✓' : ''}</span>Wrap Text
-              <span className={styles.hint}>Alt+Z</span>
-            </button>
-            {isMd && (
-              <>
-                <div className={styles.separator}></div>
-                <button onClick={() => run(onToggleLiveMarkdownPreview)}>
-                  <span className={styles.check}>
-                    {liveMarkdownPreview ? '✓' : ''}
-                  </span>
-                  Live Preview
-                </button>
-                <button onClick={() => run(onTogglePreviewPane)}>
-                  <span className={styles.check}>
-                    {showPreviewPane ? '✓' : ''}
-                  </span>
-                  Preview Pane
-                </button>
-              </>
-            )}
-            <div className={styles.separator}></div>
-            <button onClick={() => run(onOpenSettings)}>Settings…</button>
-          </div>
-        )}
+        </MenuButton>
+        <Menu store={menu} gutter={4} className={styles.menuDropdown}>
+          <MenuItem onClick={() => run(onNew)}>
+            New <span className={styles.hint}>{modLabel}N</span>
+          </MenuItem>
+          <MenuItem onClick={() => run(onNewWindow)}>
+            New Window <span className={styles.hint}>{modLabel}Shift+N</span>
+          </MenuItem>
+          <MenuItem onClick={() => run(onOpen)}>
+            Open… <span className={styles.hint}>{modLabel}O</span>
+          </MenuItem>
+          {recentFiles.length > 0 && (
+            <>
+              <p className={styles.sectionLabel}>Recent</p>
+              {recentFiles.slice(0, 5).map((path) => (
+                <MenuItem
+                  key={path}
+                  className={styles.recentItem}
+                  title={path}
+                  onClick={() => run(() => onOpenRecent(path))}
+                >
+                  {baseName(path)}
+                </MenuItem>
+              ))}
+              <MenuSeparator className={styles.separator} />
+            </>
+          )}
+          <MenuItem onClick={() => run(onSave)}>
+            Save <span className={styles.hint}>{modLabel}S</span>
+          </MenuItem>
+          <MenuItem onClick={() => run(onSaveAs)}>
+            Save As… <span className={styles.hint}>{modLabel}Shift+S</span>
+          </MenuItem>
+          <MenuSeparator className={styles.separator} />
+          <MenuItemCheckbox
+            name="wrap"
+            checked={wrap}
+            onClick={() => run(onToggleWrap)}
+          >
+            Wrap Text <span className={styles.hint}>Alt+Z</span>
+          </MenuItemCheckbox>
+          {isMd && (
+            <>
+              <MenuSeparator className={styles.separator} />
+              <MenuItemCheckbox
+                name="liveMarkdownPreview"
+                checked={liveMarkdownPreview}
+                onClick={() => run(onToggleLiveMarkdownPreview)}
+              >
+                Live Preview
+              </MenuItemCheckbox>
+              <MenuItemCheckbox
+                name="showPreviewPane"
+                checked={showPreviewPane}
+                onClick={() => run(onTogglePreviewPane)}
+              >
+                Preview Pane
+              </MenuItemCheckbox>
+            </>
+          )}
+          <MenuSeparator className={styles.separator} />
+          <MenuItem onClick={() => run(onOpenSettings)}>Settings…</MenuItem>
+        </Menu>
       </div>
       <div className={styles.dragRegion} data-tauri-drag-region>
         <span className={styles.title} data-tauri-drag-region>

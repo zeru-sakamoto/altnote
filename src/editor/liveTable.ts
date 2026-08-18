@@ -392,6 +392,102 @@ const FORMAT_SHORTCUTS: Record<string, [string, string]> = {
   u: ['<u>', '</u>'],
 };
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+const CELL_MARK_RE =
+  /\*\*([^*]+)\*\*|(?<!\*)\*([^*]+)\*(?!\*)|~~([^~]+)~~|<u>([^<]*)<\/u>/g;
+
+interface CellToken {
+  /** Raw source text of this run, markers excluded. */
+  raw: string;
+  /** Offset of `raw` within the cell's full source string. */
+  from: number;
+  tag: 'strong' | 'em' | 'del' | 'u' | null;
+}
+
+/** Splits a cell's raw Markdown source into alternating plain/formatted runs
+ * (bold/italic/underline/strikethrough — the marks FORMAT_SHORTCUTS and
+ * Mod-Shift-X produce). Shared base for renderCellHtml (display) and
+ * renderedOffsetToRawOffset (click-to-caret mapping) so the two can't drift
+ * out of sync with each other. */
+function tokenizeCell(text: string): CellToken[] {
+  const tokens: CellToken[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  CELL_MARK_RE.lastIndex = 0;
+  while ((match = CELL_MARK_RE.exec(text))) {
+    if (match.index > lastIndex) {
+      tokens.push({
+        raw: text.slice(lastIndex, match.index),
+        from: lastIndex,
+        tag: null,
+      });
+    }
+    let tag: CellToken['tag'];
+    let raw: string;
+    let openLen: number;
+    if (match[1] !== undefined) {
+      tag = 'strong';
+      raw = match[1];
+      openLen = 2;
+    } else if (match[2] !== undefined) {
+      tag = 'em';
+      raw = match[2];
+      openLen = 1;
+    } else if (match[3] !== undefined) {
+      tag = 'del';
+      raw = match[3];
+      openLen = 2;
+    } else {
+      tag = 'u';
+      raw = match[4] ?? '';
+      openLen = 3; // '<u>'
+    }
+    tokens.push({ raw, from: match.index + openLen, tag });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    tokens.push({ raw: text.slice(lastIndex), from: lastIndex, tag: null });
+  }
+  return tokens;
+}
+
+/** Renders a cell's raw Markdown source to display HTML. Shown only while
+ * the cell is blurred; editing always works against the plain-text source
+ * (see makeEditableCell's focus/blur handlers). */
+export function renderCellHtml(text: string): string {
+  return tokenizeCell(text)
+    .map((t) => {
+      const escaped = escapeHtml(t.raw);
+      return t.tag ? `<${t.tag}>${escaped}</${t.tag}>` : escaped;
+    })
+    .join('');
+}
+
+/** Inverse of renderCellHtml's text flattening: given an offset into the
+ * *rendered* plain text (e.g. from a click hit-tested against the formatted
+ * DOM), returns the corresponding offset into the raw Markdown source —
+ * needed because clicking a formatted cell swaps its DOM from rendered HTML
+ * to raw text on focus, which would otherwise strand the caret. */
+export function renderedOffsetToRawOffset(
+  text: string,
+  renderedOffset: number,
+): number {
+  let pos = 0;
+  for (const t of tokenizeCell(text)) {
+    if (renderedOffset <= pos + t.raw.length) {
+      return t.from + (renderedOffset - pos);
+    }
+    pos += t.raw.length;
+  }
+  return text.length;
+}
+
 interface CellContext {
   /** -1 for the header row, 0-based index into model.rows otherwise. */
   row: number;
@@ -414,15 +510,51 @@ function makeEditableCell(
   const cell = document.createElement('div');
   cell.className = 'cm-md-table-cell-editable';
   cell.contentEditable = 'true';
-  cell.textContent = text;
+  cell.innerHTML = renderCellHtml(text);
   cell.dataset.row = String(ctx.row);
   cell.dataset.col = String(ctx.col);
   if (align) cell.style.textAlign = align;
+
+  // Editing always happens against the raw Markdown source (a single plain
+  // text node, required by getCellSelectionOffsets/setCellSelectionOffsets);
+  // the formatted HTML from renderCellHtml is swapped in only while blurred.
+  cell.addEventListener('focus', () => {
+    cell.textContent = text;
+  });
+
+  // A click that focuses the cell hit-tests against the *rendered* (marker-
+  // stripped) DOM, but focus immediately swaps that DOM for raw text —
+  // stranding the caret at whatever the browser's default placement lands
+  // on. Take over: hit-test the click ourselves before the swap, translate
+  // it to a raw-text offset, and place the caret there after focusing.
+  // ponytail: only the initial focusing click is special-cased, so a
+  // click-drag starting on that same click won't extend a selection (native
+  // drag-select still works once the cell is already focused).
+  cell.addEventListener('mousedown', (e) => {
+    if (document.activeElement === cell) return;
+    const caret = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (!caret || !cell.contains(caret.startContainer)) return;
+    const pre = document.createRange();
+    pre.selectNodeContents(cell);
+    pre.setEnd(caret.startContainer, caret.startOffset);
+    const renderedOffset = pre.toString().length;
+
+    e.preventDefault();
+    cell.focus();
+    const rawOffset = renderedOffsetToRawOffset(text, renderedOffset);
+    setCellSelectionOffsets(cell, rawOffset, rawOffset);
+  });
 
   cell.addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey;
     if (mod) {
       const key = e.key.toLowerCase();
+      if (key === 'a') {
+        e.preventDefault();
+        e.stopPropagation();
+        setCellSelectionOffsets(cell, 0, cell.textContent?.length ?? 0);
+        return;
+      }
       const shortcut =
         key === 'x' && e.shiftKey
           ? (['~~', '~~'] as [string, string])
@@ -440,9 +572,11 @@ function makeEditableCell(
             open,
             close,
           );
+          // Update the cell locally only — committing here would rebuild the
+          // whole table widget (model changed => new DOM) and blur the cell
+          // mid-edit. The blur handler below persists the change instead.
           cell.textContent = result.text;
           setCellSelectionOffsets(cell, result.from, result.to);
-          onCommit(result.text);
         }
         return;
       }
@@ -527,6 +661,7 @@ function makeEditableCell(
   cell.addEventListener('blur', () => {
     const next = (cell.textContent ?? '').trim();
     if (next !== text) onCommit(next);
+    cell.innerHTML = renderCellHtml(next);
   });
   return cell;
 }

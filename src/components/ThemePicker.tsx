@@ -1,4 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  Combobox,
+  ComboboxItem,
+  ComboboxPopover,
+  useComboboxStore,
+} from '@ariakit/react';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettings, setThemeId, cacheCustomTheme } from '../settings/store';
 import { presetThemes } from '../theme/presets';
@@ -19,13 +25,24 @@ export default function ThemePicker() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const allThemes = [
+    { id: '', label: 'Default' },
     ...presetThemes.map((p) => ({ id: p.id, label: p.label })),
     ...settings.customThemes.map((c) => ({ id: c.id, label: c.label })),
   ];
+  const selectedTheme =
+    allThemes.find((t) => t.id === (settings.themeId ?? '')) ?? allThemes[0];
 
-  function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
-    const value = e.currentTarget.value;
-    setThemeId(value === '' ? null : value);
+  const combobox = useComboboxStore({ defaultValue: selectedTheme.label });
+  const searchValue = combobox.useState('value');
+
+  const filteredThemes = useMemo(() => {
+    const query = searchValue.trim().toLowerCase();
+    if (!query) return allThemes;
+    return allThemes.filter((t) => t.label.toLowerCase().includes(query));
+  }, [searchValue, allThemes]);
+
+  function handleSelect(theme: { id: string; label: string }) {
+    setThemeId(theme.id === '' ? null : theme.id);
   }
 
   async function importFromUrl() {
@@ -77,19 +94,33 @@ export default function ThemePicker() {
   return (
     <>
       <div className={styles.field}>
-        <label htmlFor="theme-select">Theme</label>
-        <select
-          id="theme-select"
-          value={settings.themeId ?? ''}
-          onChange={handleSelect}
+        <label htmlFor="theme-combobox">Theme</label>
+        <Combobox
+          id="theme-combobox"
+          store={combobox}
+          placeholder="Search themes…"
+          className={styles.combobox}
+        />
+        <ComboboxPopover
+          store={combobox}
+          gutter={4}
+          sameWidth
+          className={styles.comboboxPopover}
         >
-          <option value="">Default</option>
-          {allThemes.map((theme) => (
-            <option key={theme.id} value={theme.id}>
+          {filteredThemes.length === 0 && (
+            <div className={styles.comboboxEmpty}>No matching themes</div>
+          )}
+          {filteredThemes.map((theme) => (
+            <ComboboxItem
+              key={theme.id || 'default'}
+              value={theme.label}
+              className={styles.comboboxItem}
+              onClick={() => handleSelect(theme)}
+            >
               {theme.label}
-            </option>
+            </ComboboxItem>
           ))}
-        </select>
+        </ComboboxPopover>
       </div>
 
       <div className={styles.field}>

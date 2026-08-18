@@ -37,9 +37,11 @@ function slashCommandsExtension(fileName: string) {
 }
 
 function lineNumbersExtension(show: boolean) {
+  // codemirror's base theme sets `.cm-gutter { display: flex !important }`,
+  // which the line-number gutter also matches — beat it with !important too.
   return show
     ? []
-    : EditorView.theme({ '.cm-lineNumbers': { display: 'none' } });
+    : EditorView.theme({ '.cm-lineNumbers': { display: 'none !important' } });
 }
 
 function themeExtension() {

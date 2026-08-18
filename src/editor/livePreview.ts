@@ -503,6 +503,7 @@ export const livePreviewTheme = EditorView.baseTheme({
     border: '1px solid var(--editor-active-line)',
     padding: '0',
     minWidth: '3em',
+    fontWeight: 'normal',
   },
   '.cm-md-table-cell-editable': {
     padding: '4px 8px',

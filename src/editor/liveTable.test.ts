@@ -12,6 +12,8 @@ import {
   moveRow,
   pasteIntoModel,
   toggleWrapText,
+  renderCellHtml,
+  renderedOffsetToRawOffset,
   type TableModel,
 } from './liveTable';
 
@@ -23,6 +25,42 @@ function parseFirstTable(source: string) {
   if (!tableNode) throw new Error('no table found in test fixture');
   return parseTableModel(Text.of(source.split('\n')), tableNode);
 }
+
+describe('renderCellHtml', () => {
+  it('renders bold, italic, underline, and strikethrough', () => {
+    expect(renderCellHtml('**bold**')).toBe('<strong>bold</strong>');
+    expect(renderCellHtml('*italic*')).toBe('<em>italic</em>');
+    expect(renderCellHtml('<u>under</u>')).toBe('<u>under</u>');
+    expect(renderCellHtml('~~strike~~')).toBe('<del>strike</del>');
+  });
+
+  it('escapes plain HTML-like text so it renders as literal characters', () => {
+    expect(renderCellHtml('<script>x</script>')).toBe(
+      '&lt;script&gt;x&lt;/script&gt;',
+    );
+  });
+
+  it('leaves unformatted text untouched', () => {
+    expect(renderCellHtml('plain text')).toBe('plain text');
+  });
+});
+
+describe('renderedOffsetToRawOffset', () => {
+  it('maps a click inside a bold run back to its raw offset', () => {
+    // raw: "hi **bold** end" (indices: h0 i1 _2 *3 *4 b5 o6 l7 d8 *9 *10 _11 ...)
+    // rendered: "hi bold end" -> offset 4 is the 'o' in "bold"
+    const raw = 'hi **bold** end';
+    expect(renderedOffsetToRawOffset(raw, 4)).toBe(6);
+  });
+
+  it('maps plain-text offsets 1:1 when there is no formatting', () => {
+    expect(renderedOffsetToRawOffset('plain text', 4)).toBe(4);
+  });
+
+  it('clamps to raw length past the end of rendered text', () => {
+    expect(renderedOffsetToRawOffset('**bold**', 100)).toBe(8);
+  });
+});
 
 describe('parseAlign', () => {
   it('reads left/right/center/none from a delimiter cell', () => {
