@@ -45,6 +45,8 @@ export const THEME_CSS_VAR_KEYS = [
   '--editor-bold-fg',
   '--editor-italic-fg',
   '--editor-quote-fg',
+  '--brand-accent',
+  '--brand-accent-fg',
 ] as const;
 
 /**
@@ -158,6 +160,34 @@ function activeLineColorFrom(foreground: string): string {
   return tintFrom(foreground, 0.06, 'rgba(128, 128, 128, 0.06)');
 }
 
+/**
+ * Picks a representative UI-brand accent from a theme's `colors` block, for the general
+ * app chrome (buttons, focus rings) rather than editor syntax — distinct from `editorLink`.
+ * Priority favors colors VS Code itself treats as UI-brand signals over incidental syntax
+ * colors; `editorLink` (which already has its own `#4ea1ff` fallback) is the last resort,
+ * so this always terminates in something usable even for a theme with an empty `colors` block.
+ */
+function accentFrom(
+  colors: Record<string, string | undefined>,
+  editorLink: string,
+): string {
+  return (
+    colors['button.background'] ??
+    colors['activityBarBadge.background'] ??
+    colors['focusBorder'] ??
+    editorLink
+  );
+}
+
+/** Relative-luminance check to pick readable text on top of an arbitrary accent color. */
+function contrastForeground(hex: string): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return '#ffffff';
+  const [r, g, b] = rgb.map((c) => c / 255);
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.55 ? '#111318' : '#ffffff';
+}
+
 function fontStyleFlags(fontStyle?: string) {
   return {
     fontStyle: fontStyle?.includes('italic') ? 'italic' : undefined,
@@ -211,6 +241,7 @@ export function convertTheme(theme: VSCodeTheme): ConvertedTheme {
     colors['editor.foreground'] ?? (dark ? '#d4d4d4' : '#1a1a1a');
   const editorLink = colors['textLink.foreground'] ?? '#4ea1ff';
   const gutterFg = colors['editorLineNumber.foreground'] ?? editorFg;
+  const accent = accentFrom(colors, editorLink);
 
   const cssVars: Record<string, string> = {
     '--editor-bg': editorBg,
@@ -229,6 +260,8 @@ export function convertTheme(theme: VSCodeTheme): ConvertedTheme {
     '--editor-bold-fg': colorForTag(t.strong) ?? editorFg,
     '--editor-italic-fg': colorForTag(t.emphasis) ?? editorFg,
     '--editor-quote-fg': colorForTag(t.quote) ?? gutterFg,
+    '--brand-accent': accent,
+    '--brand-accent-fg': contrastForeground(accent),
   };
 
   return { name: theme.name ?? 'Custom Theme', dark, highlightStyle, cssVars };

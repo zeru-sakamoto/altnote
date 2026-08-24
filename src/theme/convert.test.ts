@@ -102,6 +102,41 @@ describe('convertTheme', () => {
   });
 });
 
+describe('accent derivation', () => {
+  const dracula = presetThemes.find((p) => p.id === 'dracula')!.theme;
+
+  it('picks button.background as the brand accent when present', () => {
+    const converted = convertTheme(dracula);
+    expect(converted.cssVars['--brand-accent']).toBe('#44475A');
+  });
+
+  it('falls back to focusBorder when button.background is absent', () => {
+    const converted = convertTheme({
+      name: 'FocusOnly',
+      colors: { focusBorder: '#6272A4' },
+    });
+    expect(converted.cssVars['--brand-accent']).toBe('#6272A4');
+  });
+
+  it('falls back to the editor link color for a theme with no colors at all', () => {
+    const converted = convertTheme({ name: 'Bare', type: 'light' });
+    expect(converted.cssVars['--brand-accent']).toBe('#4ea1ff');
+  });
+
+  it('picks white text on a dark accent and dark text on a light accent', () => {
+    const dark = convertTheme({
+      name: 'DarkAccent',
+      colors: { 'button.background': '#111111' },
+    });
+    const light = convertTheme({
+      name: 'LightAccent',
+      colors: { 'button.background': '#f5f5f5' },
+    });
+    expect(dark.cssVars['--brand-accent-fg']).toBe('#ffffff');
+    expect(light.cssVars['--brand-accent-fg']).toBe('#111318');
+  });
+});
+
 describe('parseThemeJson', () => {
   it('parses strict JSON', () => {
     expect(parseThemeJson('{"name": "Test"}').name).toBe('Test');

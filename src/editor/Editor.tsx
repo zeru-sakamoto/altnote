@@ -142,8 +142,11 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       loadContent: (text) => {
         const view = viewRef.current;
         if (!view) return;
+        const clamp = (pos: number) => Math.min(pos, text.length);
+        const { anchor, head } = view.state.selection.main;
         view.dispatch({
           changes: { from: 0, to: view.state.doc.length, insert: text },
+          selection: { anchor: clamp(anchor), head: clamp(head) },
           userEvent: 'altnote.load',
         });
       },

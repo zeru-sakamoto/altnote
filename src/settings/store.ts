@@ -28,7 +28,7 @@ const DEFAULTS: Settings = {
   themeId: null,
   customThemes: [],
   liveMarkdownPreview: true,
-  autoSave: false,
+  autoSave: true,
   lineNumbers: true,
 };
 const MAX_RECENT = 8;

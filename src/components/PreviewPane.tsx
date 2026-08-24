@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import MarkdownIt from 'markdown-it';
+import { cn } from '@/lib/utils';
 import styles from './PreviewPane.module.css';
 
 interface Props {
@@ -24,7 +25,7 @@ export default function PreviewPane({ content }: Props) {
 
   return (
     <div
-      className={styles.preview}
+      className={cn(styles.preview, 'border-l border-border')}
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: html }}
     />

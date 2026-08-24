@@ -5,7 +5,9 @@
   box-sizing: border-box;
   background-color: var(--editor-bg);
   color: var(--editor-fg);
-  border-left: 1px solid var(--titlebar-button-hover);
+  /* Border moved to a Tailwind class (border-l border-border) in PreviewPane.tsx — kept out
+     of this unlayered CSS-Modules rule so it doesn't permanently beat the layered Tailwind
+     utility regardless of which one is "more specific" (see src/index.css cascade-layer note). */
 }
 
 .preview :global(h1),

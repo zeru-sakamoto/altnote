@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { IconLayoutSidebarRight } from '@tabler/icons-react';
 import Editor, { type EditorHandle } from './editor/Editor';
 import Titlebar from './Titlebar';
 import PreviewPane from './components/PreviewPane';
 import SettingsPanel from './components/Settings';
 import WelcomeScreen from './components/WelcomeScreen';
+import { Toggle } from '@/components/ui/toggle';
 import { isMarkdownFile } from './editor/languages';
 import {
   useSettings,
@@ -17,11 +19,13 @@ import {
 import { getActiveTheme } from './theme/store';
 import { THEME_CSS_VAR_KEYS } from './theme/convert';
 import {
+  askFileConflict,
   askUnsavedChanges,
   fileNameFromPath,
   pickPath,
   openPath,
   saveAsDialog,
+  watchFile,
   writeFile,
 } from './lib/file';
 import { createEditorWindow } from './lib/window';
@@ -29,6 +33,8 @@ import { message } from '@tauri-apps/plugin-dialog';
 import styles from './App.module.css';
 
 const AUTO_SAVE_DELAY_MS = 1000;
+/** Watch events for our own writeFile() calls arrive shortly after; ignore anything in this window. */
+const SELF_WRITE_IGNORE_MS = 1000;
 
 /** File path this window was opened with (OS "open with" / relaunch / another window's Open), if any. */
 const initialPath = new URLSearchParams(window.location.search).get('path');
@@ -49,10 +55,12 @@ export default function App() {
   // mount) always see the latest values without needing to be re-registered.
   const latest = useRef({ path, fileName, dirty, wrap });
   latest.current = { path, fileName, dirty, wrap };
+  const lastSelfWriteRef = useRef(0);
 
   const isMd = isMarkdownFile(fileName);
-  const showWelcome =
-    !path && !dirty && docText === '' && settings.recentFiles.length > 0;
+  // No `recentFiles.length > 0` gate: WelcomeScreen now renders an empty state for a
+  // first-run user with no recent files yet, instead of showing nothing at all.
+  const showWelcome = !path && !dirty && docText === '';
   const windowTitle = `${dirty ? '● ' : ''}${fileName} — AltNote`;
 
   async function performSave(): Promise<boolean> {
@@ -61,6 +69,7 @@ export default function App() {
       targetPath = await saveAsDialog(latest.current.fileName);
       if (!targetPath) return false;
     }
+    lastSelfWriteRef.current = Date.now();
     await writeFile(targetPath, editorRef.current?.getContent() ?? '');
     setPath(targetPath);
     setFileName(fileNameFromPath(targetPath));
@@ -72,6 +81,7 @@ export default function App() {
   async function performSaveAs(): Promise<boolean> {
     const targetPath = await saveAsDialog(latest.current.fileName);
     if (!targetPath) return false;
+    lastSelfWriteRef.current = Date.now();
     await writeFile(targetPath, editorRef.current?.getContent() ?? '');
     setPath(targetPath);
     setFileName(fileNameFromPath(targetPath));
@@ -115,6 +125,23 @@ export default function App() {
           kind: 'error',
         },
       );
+    }
+  }
+
+  /** Called when the currently-open file changes on disk from outside AltNote. */
+  async function handleExternalChange() {
+    const changedPath = latest.current.path;
+    if (!changedPath) return;
+    if (latest.current.dirty) {
+      const choice = await askFileConflict(latest.current.fileName);
+      if (choice === 'keepMine') return;
+    }
+    try {
+      const opened = await openPath(changedPath);
+      editorRef.current?.loadContent(opened.content);
+      setDirty(false);
+    } catch {
+      // File may have been moved/deleted externally — leave the in-app content as-is.
     }
   }
 
@@ -211,6 +238,27 @@ export default function App() {
     void getCurrentWindow().setTitle(windowTitle);
   }, [windowTitle]);
 
+  // Live-reload: watch the open file for external changes so edits made by
+  // another program (or another AltNote window on the same file) show up here
+  // instead of silently getting clobbered by our own next save.
+  useEffect(() => {
+    if (!path) return;
+    let cancelled = false;
+    let unwatch: (() => void) | undefined;
+    void watchFile(path, () => {
+      if (Date.now() - lastSelfWriteRef.current < SELF_WRITE_IGNORE_MS) return;
+      void handleExternalChange();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unwatch = fn;
+    });
+    return () => {
+      cancelled = true;
+      unwatch?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
+
   // Debounced autosave: only for documents that already have a disk path,
   // so this never silently pops a Save As dialog while the user is typing.
   useEffect(() => {
@@ -275,8 +323,8 @@ export default function App() {
           recentFiles={settings.recentFiles}
           onOpenRecent={(p) => void openRecent(p)}
         />
-        <div className={styles.editorArea}>
-          <div className={styles.editorPane}>
+        <div className="flex min-h-0 flex-1">
+          <div className="relative min-w-0 flex-1">
             <Editor
               ref={editorRef}
               fileName={fileName}
@@ -296,9 +344,19 @@ export default function App() {
                 onOpenRecent={(p) => void openRecent(p)}
               />
             )}
+            {isMd && (
+              <Toggle
+                aria-label="Toggle preview pane"
+                pressed={showPreviewPane}
+                onPressedChange={togglePreviewPane}
+                className="absolute top-2 right-2 data-[state=on]:bg-brand-accent data-[state=on]:text-brand-accent-foreground data-[state=on]:hover:bg-brand-accent-hover"
+              >
+                <IconLayoutSidebarRight size={16} stroke={1.75} />
+              </Toggle>
+            )}
           </div>
           {isMd && showPreviewPane && (
-            <div className={styles.previewPane}>
+            <div className="min-w-0 flex-1">
               <PreviewPane content={docText} />
             </div>
           )}

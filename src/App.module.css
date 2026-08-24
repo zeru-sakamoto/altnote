@@ -4,20 +4,3 @@
   display: flex;
   flex-direction: column;
 }
-
-.editorArea {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.editorPane {
-  flex: 1;
-  min-width: 0;
-  position: relative;
-}
-
-.previewPane {
-  flex: 1;
-  min-width: 0;
-}
