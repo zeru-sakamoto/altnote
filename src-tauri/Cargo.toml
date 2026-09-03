@@ -1,6 +1,6 @@
 [package]
 name = "c-usersanzelappdatalocaltempaltnote-scaffold"
-version = "1.3.0"
+version = "1.4.0"
 description = "A windows notepad replacement"
 authors = ["you"]
 edition = "2021"

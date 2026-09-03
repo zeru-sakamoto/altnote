@@ -15,6 +15,7 @@ import {
   setLiveMarkdownPreview,
   addRecentFile,
   removeRecentFile,
+  setLastWindowSize,
 } from './settings/store';
 import { getActiveTheme } from './theme/store';
 import { THEME_CSS_VAR_KEYS } from './theme/convert';
@@ -218,12 +219,16 @@ export default function App() {
     let unlistenClose: (() => void) | undefined;
     getCurrentWindow()
       .onCloseRequested(async (event) => {
+        const win = getCurrentWindow();
+        const size = (await win.innerSize()).toLogical(await win.scaleFactor());
+        setLastWindowSize(size.width, size.height);
+
         if (!latest.current.dirty) return;
         event.preventDefault();
         const choice = await askUnsavedChanges(latest.current.fileName);
         if (choice === 'cancel') return;
         if (choice === 'save' && !(await performSave())) return;
-        await getCurrentWindow().destroy();
+        await win.destroy();
       })
       .then((unlisten) => (unlistenClose = unlisten));
 

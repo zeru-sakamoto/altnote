@@ -18,6 +18,8 @@ export interface Settings {
   liveMarkdownPreview: boolean;
   autoSave: boolean;
   lineNumbers: boolean;
+  lastWindowWidth: number | null;
+  lastWindowHeight: number | null;
 }
 
 const DEFAULTS: Settings = {
@@ -30,6 +32,8 @@ const DEFAULTS: Settings = {
   liveMarkdownPreview: true,
   autoSave: true,
   lineNumbers: true,
+  lastWindowWidth: null,
+  lastWindowHeight: null,
 };
 const MAX_RECENT = 8;
 const MAX_CUSTOM_THEMES = 10;
@@ -73,6 +77,8 @@ export async function initSettings() {
     liveMarkdownPreview,
     autoSave,
     lineNumbers,
+    lastWindowWidth,
+    lastWindowHeight,
   ] = await Promise.all([
     backingStore.get<string | null>('font'),
     backingStore.get<number | null>('fontSize'),
@@ -83,6 +89,8 @@ export async function initSettings() {
     backingStore.get<boolean>('liveMarkdownPreview'),
     backingStore.get<boolean>('autoSave'),
     backingStore.get<boolean>('lineNumbers'),
+    backingStore.get<number | null>('lastWindowWidth'),
+    backingStore.get<number | null>('lastWindowHeight'),
   ]);
   const patch: Partial<Settings> = {};
   if (font !== undefined) patch.font = font;
@@ -95,6 +103,8 @@ export async function initSettings() {
     patch.liveMarkdownPreview = liveMarkdownPreview;
   if (autoSave !== undefined) patch.autoSave = autoSave;
   if (lineNumbers !== undefined) patch.lineNumbers = lineNumbers;
+  if (lastWindowWidth !== undefined) patch.lastWindowWidth = lastWindowWidth;
+  if (lastWindowHeight !== undefined) patch.lastWindowHeight = lastWindowHeight;
   setState(patch);
 }
 
@@ -126,6 +136,12 @@ export function setAutoSave(autoSave: boolean) {
 export function setLineNumbers(lineNumbers: boolean) {
   setState({ lineNumbers });
   void backingStore?.set('lineNumbers', lineNumbers);
+}
+
+export function setLastWindowSize(width: number, height: number) {
+  setState({ lastWindowWidth: width, lastWindowHeight: height });
+  void backingStore?.set('lastWindowWidth', width);
+  void backingStore?.set('lastWindowHeight', height);
 }
 
 export function addRecentFile(path: string) {
