@@ -407,7 +407,7 @@ dependencies = [
 
 [[package]]
 name = "c-usersanzelappdatalocaltempaltnote-scaffold"
-version = "1.3.0"
+version = "1.5.0"
 dependencies = [
  "flate2",
  "font-kit",

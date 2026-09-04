@@ -117,11 +117,49 @@ function trashIcon(): HTMLSpanElement {
   );
 }
 
+/** Splits a table row's raw source text on unescaped `|`, preserving empty cells.
+ * `@lezer/markdown` omits the `TableCell` syntax node entirely for empty cells, so cells
+ * can't be read off the syntax tree by count — this mirrors markdown-it's own `table` rule
+ * (split on unescaped `|`, then drop a boundary field only if it came from an optional
+ * leading/trailing pipe) to keep every column at its correct index. */
+function splitRowCells(text: string): string[] {
+  const parts: string[] = [];
+  let cur = '';
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\\' && text[i + 1] === '|') {
+      cur += '\\|';
+      i++;
+      continue;
+    }
+    if (text[i] === '|') {
+      parts.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += text[i];
+  }
+  parts.push(cur);
+  if (
+    parts.length > 1 &&
+    parts[0].trim() === '' &&
+    text.trimStart().startsWith('|')
+  ) {
+    parts.shift();
+  }
+  if (
+    parts.length > 1 &&
+    parts[parts.length - 1].trim() === '' &&
+    text.trimEnd().endsWith('|')
+  ) {
+    parts.pop();
+  }
+  return parts.map((s) => unescapeCell(s.trim()));
+}
+
 /** Reads a `Table` syntax node's header/alignment/body rows into a plain, editable model. */
 export function parseTableModel(doc: Text, tableNode: SyntaxNode): TableModel {
   const slice = (n: SyntaxNode) => doc.sliceString(n.from, n.to);
-  const cellsOf = (row: SyntaxNode) =>
-    row.getChildren('TableCell').map((c) => unescapeCell(slice(c).trim()));
+  const cellsOf = (row: SyntaxNode) => splitRowCells(slice(row));
 
   const headerNode = tableNode.getChild('TableHeader');
   const delimNode = tableNode.getChild('TableDelimiter');

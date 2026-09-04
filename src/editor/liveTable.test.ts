@@ -96,6 +96,38 @@ describe('parseTableModel + serializeTable', () => {
     expect(model.rows).toEqual([['a|b']]);
     expect(serializeTable(model)).toContain('a\\|b');
   });
+
+  it('keeps a blank interior cell at its own column instead of shifting later cells left', () => {
+    const withEmptyMiddle = '| A | B | C |\n| --- | --- | --- |\n| 1 |  | 3 |';
+    const model = parseFirstTable(withEmptyMiddle);
+    expect(model.rows).toEqual([['1', '', '3']]);
+  });
+
+  it('keeps a blank leading cell at column 0', () => {
+    const withEmptyLeading = '| A | B | C |\n| --- | --- | --- |\n|  | 2 | 3 |';
+    const model = parseFirstTable(withEmptyLeading);
+    expect(model.rows).toEqual([['', '2', '3']]);
+  });
+
+  it('keeps a blank trailing cell at the last column', () => {
+    const withEmptyTrailing =
+      '| A | B | C |\n| --- | --- | --- |\n| 1 | 2 |  |';
+    const model = parseFirstTable(withEmptyTrailing);
+    expect(model.rows).toEqual([['1', '2', '']]);
+  });
+
+  it('keeps a blank header cell aligned with its column', () => {
+    const withEmptyHeader = '| A |  | C |\n| --- | --- | --- |\n| 1 | 2 | 3 |';
+    const model = parseFirstTable(withEmptyHeader);
+    expect(model.header).toEqual(['A', '', 'C']);
+  });
+
+  it('applies per-column alignment correctly around an empty cell', () => {
+    const source = '| A | B | C |\n| :--- | :---: | ---: |\n| 1 |  | 3 |';
+    const model = parseFirstTable(source);
+    expect(model.align).toEqual(['left', 'center', 'right']);
+    expect(model.rows).toEqual([['1', '', '3']]);
+  });
 });
 
 describe('nextAlign', () => {
