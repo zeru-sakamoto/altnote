@@ -88,6 +88,53 @@ class BulletWidget extends WidgetType {
 }
 const BULLET = Decoration.replace({ widget: new BulletWidget() });
 
+const BULLET_MARKERS = new Set(['-', '*', '+']);
+const NON_LIST_CONTEXT = new Set(['FencedCode', 'CodeBlock', 'InlineCode']);
+
+/** CommonMark only recognizes `-`/`*`/`+` as a list marker once it's followed
+ * by whitespace, so typing the marker alone on a blank line (which the live
+ * preview already renders as a bullet, since a marker with nothing after it
+ * is still a valid empty list item) and then continuing to type produces
+ * `-text` — invalid marker syntax that drops right back to plain text. This
+ * computes the extra space to insert alongside the marker itself so the line
+ * stays valid list syntax the moment typing continues. Returns `null` when
+ * `insertedText` isn't a lone marker typed onto an otherwise-blank line. */
+export function bulletAutoSpaceInsert(
+  state: EditorState,
+  from: number,
+  to: number,
+  insertedText: string,
+): { insert: string; cursor: number } | null {
+  if (from !== to || !BULLET_MARKERS.has(insertedText)) return null;
+  const line = state.doc.lineAt(from);
+  if (line.text.trim().length !== 0) return null;
+
+  let node = syntaxTree(state).resolveInner(from, -1);
+  while (node) {
+    if (NON_LIST_CONTEXT.has(node.type.name)) return null;
+    if (!node.parent) break;
+    node = node.parent;
+  }
+
+  return { insert: `${insertedText} `, cursor: from + 2 };
+}
+
+/** Inserts a trailing space alongside a bullet marker typed onto a blank
+ * line, so the live-preview bullet it already shows stays valid once the
+ * user keeps typing. See `bulletAutoSpaceInsert`. */
+const bulletAutoSpace = EditorView.inputHandler.of(
+  (view, from, to, insertedText) => {
+    const result = bulletAutoSpaceInsert(view.state, from, to, insertedText);
+    if (!result) return false;
+    view.dispatch({
+      changes: { from, to, insert: result.insert },
+      selection: { anchor: result.cursor },
+      userEvent: 'input.type',
+    });
+    return true;
+  },
+);
+
 /** `[ ]`/`[x]`/`[X]` -> the opposite marker text. Exported for a unit test, since a real
  * CodeMirror EditorView needs a DOM (this project's vitest config runs under `node`). */
 export function toggleTaskMarkerText(markerText: string): string {
@@ -494,6 +541,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   '.cm-md-table-wrap': {
     position: 'relative',
     padding: '4px 0',
+    maxWidth: '100%',
+    overflowX: 'auto',
   },
   '.cm-md-table': {
     borderCollapse: 'collapse',
@@ -508,6 +557,10 @@ export const livePreviewTheme = EditorView.baseTheme({
   '.cm-md-table-cell-editable': {
     padding: '4px 8px',
     outline: 'none',
+    maxWidth: '32em',
+    whiteSpace: 'normal',
+    overflowWrap: 'break-word',
+    wordBreak: 'break-word',
   },
   '.cm-md-table-cell-editable:focus': {
     outline: '1px solid var(--editor-link, #4ea1ff)',
@@ -657,4 +710,5 @@ export const livePreview = [
   tableField,
   headingGutterField,
   livePreviewTheme,
+  bulletAutoSpace,
 ];

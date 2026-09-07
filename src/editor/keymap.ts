@@ -3,6 +3,8 @@ import { EditorSelection, type EditorState } from '@codemirror/state';
 import { EditorView, keymap, type KeyBinding } from '@codemirror/view';
 import {
   copyLineDown,
+  indentLess,
+  indentMore,
   moveLineDown,
   moveLineUp,
   toggleComment,
@@ -296,8 +298,36 @@ function tabOutOfWrap(view: EditorView): boolean {
   return true;
 }
 
+/** Whether `pos` sits inside a markdown list item, so Tab/Shift-Tab should
+ * indent/dedent the list rather than leaving Tab to do nothing and
+ * Shift-Tab to fall through to the browser's default focus-out. */
+export function isInsideListItem(state: EditorState, pos: number): boolean {
+  const tree = ensureSyntaxTree(state, pos, 200) ?? syntaxTree(state);
+  let node = tree.resolveInner(pos, -1);
+  while (node) {
+    if (node.type.name === 'ListItem') return true;
+    if (!node.parent) break;
+    node = node.parent;
+  }
+  return false;
+}
+
+function indentListItem(view: EditorView): boolean {
+  if (!isInsideListItem(view.state, view.state.selection.main.head))
+    return false;
+  return indentMore(view);
+}
+
+function dedentListItem(view: EditorView): boolean {
+  if (!isInsideListItem(view.state, view.state.selection.main.head))
+    return false;
+  return indentLess(view);
+}
+
 const vsCodeBindings: readonly KeyBinding[] = [
   { key: 'Tab', run: tabOutOfWrap },
+  { key: 'Tab', run: indentListItem },
+  { key: 'Shift-Tab', run: dedentListItem },
   { key: 'Mod-Enter', run: insertLineBelow },
   { key: 'Mod-Shift-Enter', run: insertLineAbove },
   { key: 'Mod-d', run: copyLineDown },

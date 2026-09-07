@@ -1,8 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { markdown } from '@codemirror/lang-markdown';
+import {
+  markdown,
+  insertNewlineContinueMarkup,
+} from '@codemirror/lang-markdown';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { GFM } from '@lezer/markdown';
-import { wrapSelectionSpec, tabOutOfWrapTarget } from './keymap';
+import {
+  wrapSelectionSpec,
+  tabOutOfWrapTarget,
+  isInsideListItem,
+} from './keymap';
 
 function apply(
   doc: string,
@@ -228,5 +235,68 @@ describe('tabOutOfWrapTarget', () => {
 
   it('returns null outside any wrap span', () => {
     expect(tabOutOfWrapTarget(stateFor('plain text'), 3)).toBeNull();
+  });
+});
+
+describe('isInsideListItem', () => {
+  function stateFor(doc: string) {
+    return EditorState.create({ doc, extensions: [mdLang] });
+  }
+
+  it('is true with the cursor inside a bullet list item', () => {
+    expect(isInsideListItem(stateFor('- item'), 6)).toBe(true);
+  });
+
+  it('is true for a marker-only (empty) list item', () => {
+    expect(isInsideListItem(stateFor('- '), 2)).toBe(true);
+  });
+
+  it('is false in a plain paragraph', () => {
+    expect(isInsideListItem(stateFor('plain text'), 3)).toBe(false);
+  });
+});
+
+// insertNewlineContinueMarkup is CodeMirror's own command (wired in via the
+// `markdown()` LanguageSupport, ahead of the default Enter binding) — these
+// lock in that Enter already continues/reverts bullet lists without any
+// app-specific code, since that behavior is load-bearing for the feature.
+describe('insertNewlineContinueMarkup (list continuation)', () => {
+  function pressEnter(doc: string, pos: number) {
+    const state = EditorState.create({
+      doc,
+      selection: EditorSelection.cursor(pos),
+      extensions: [mdLang],
+    });
+    let result = state;
+    insertNewlineContinueMarkup({
+      state,
+      dispatch: (tr) => {
+        result = tr.state;
+      },
+    });
+    return { doc: result.doc.toString(), cursor: result.selection.main.head };
+  }
+
+  it('continues a bullet list onto the next line', () => {
+    const { doc, cursor } = pressEnter('- item', 6);
+    expect(doc).toBe('- item\n- ');
+    expect(cursor).toBe(9);
+  });
+
+  it('removes the marker when pressing Enter on a lone empty list item', () => {
+    const { doc, cursor } = pressEnter('- ', 2);
+    expect(doc).toBe('');
+    expect(cursor).toBe(0);
+  });
+
+  it('takes a second Enter to drop out of a continued (two-item) list', () => {
+    // First Enter on the fresh empty item just separates it into its own
+    // paragraph (a "loose" list); the second Enter — now preceded by a
+    // blank line — is what actually removes the marker and exits the list.
+    const first = pressEnter('- item\n- ', 9);
+    expect(first.doc).toBe('- item\n\n- ');
+    const second = pressEnter(first.doc, first.cursor);
+    expect(second.doc).toBe('- item\n\n');
+    expect(second.cursor).toBe(8);
   });
 });
