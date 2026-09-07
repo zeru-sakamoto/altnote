@@ -116,7 +116,7 @@ export default function Titlebar({
                 checked={liveMarkdownPreview}
                 onClick={() => run(onToggleLiveMarkdownPreview)}
               >
-                Live Preview
+                Live Preview <span className={styles.hint}>{modLabel}E</span>
               </MenuItemCheckbox>
               <MenuItemCheckbox
                 name="showPreviewPane"

@@ -1,4 +1,5 @@
 import { syntaxTree } from '@codemirror/language';
+import type { SyntaxNode } from '@lezer/common';
 import {
   RangeSet,
   StateField,
@@ -15,10 +16,74 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { ImageWidget } from './liveImage';
 import { TableWidget, parseTableModel } from './liveTable';
 
 export { currentFilePath } from './liveImage';
+
+/** Nodes whose range is (or contains, via a `URL` child) a clickable link
+ * destination — used by `getLinkUrlAt` to resolve what Ctrl-click should open. */
+const LINK_CONTAINER_NODES = new Set(['Link', 'Image', 'Autolink']);
+
+/** Finds the URL a Ctrl-click at `pos` should open, if any. Walks up from the
+ * innermost syntax node: a bare GFM autolink (see the `URL`-handling branch
+ * in `buildDecorations`) *is* a `URL` node itself, while an inline
+ * `[text](url)`/`![alt](url)`/`<url>` link has a separate `URL` child holding
+ * the destination. Returns `null` for anything else (plain text, WikiLinks —
+ * an internal reference rather than an openable URL). */
+export function getLinkUrlAt(state: EditorState, pos: number): string | null {
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1);
+  while (node) {
+    if (node.type.name === 'URL') {
+      return state.doc.sliceString(node.from, node.to);
+    }
+    if (LINK_CONTAINER_NODES.has(node.type.name)) {
+      const urlNode = node.getChild('URL');
+      if (urlNode) return state.doc.sliceString(urlNode.from, urlNode.to);
+    }
+    node = node.parent;
+  }
+  return null;
+}
+
+/** Ctrl/Cmd-click on a link (inline, autolink, or bare GFM URL) opens it in
+ * the system browser instead of just moving the cursor. */
+export const linkClickHandler = EditorView.domEventHandlers({
+  mousedown(event, view) {
+    if (!(event.ctrlKey || event.metaKey) || event.button !== 0) return false;
+    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (pos == null) return false;
+    const url = getLinkUrlAt(view.state, pos);
+    if (!url) return false;
+    event.preventDefault();
+    void openUrl(url);
+    return true;
+  },
+});
+
+/** Toggles `.cm-mod-down` on the editor while Ctrl/Cmd is held, so
+ * `.cm-md-link` can show a pointer cursor only while a click on it would
+ * actually open the link (see `linkClickHandler`). */
+class ModKeyHoverPlugin {
+  private onKeyChange = (e: KeyboardEvent) => {
+    this.view.dom.classList.toggle('cm-mod-down', e.ctrlKey || e.metaKey);
+  };
+  private onBlur = () => this.view.dom.classList.remove('cm-mod-down');
+
+  constructor(private view: EditorView) {
+    window.addEventListener('keydown', this.onKeyChange);
+    window.addEventListener('keyup', this.onKeyChange);
+    window.addEventListener('blur', this.onBlur);
+  }
+
+  destroy() {
+    window.removeEventListener('keydown', this.onKeyChange);
+    window.removeEventListener('keyup', this.onKeyChange);
+    window.removeEventListener('blur', this.onBlur);
+  }
+}
+const modKeyHover = ViewPlugin.fromClass(ModKeyHoverPlugin);
 
 const HIDE = Decoration.replace({});
 
@@ -259,9 +324,17 @@ function buildDecorations(view: EditorView): DecorationSet {
               node.to,
             ),
           );
-        } else if (type === 'URL' && !onCursorLine) {
-          // The "(https://...)" destination part of a link, hidden unless being edited.
-          ranges.push(HIDE.range(node.from, node.to));
+        } else if (type === 'URL') {
+          // GFM's bare-URL autolink extension (e.g. a plain "https://..." with no
+          // [text](url) wrapper) reuses this same node name for the whole visible
+          // span, unlike the "(https://...)" destination part of an inline link
+          // (parented by Link/Image) which has a separate label and should hide.
+          const parentType = node.node.parent?.type.name;
+          if (parentType === 'Link' || parentType === 'Image') {
+            if (!onCursorLine) ranges.push(HIDE.range(node.from, node.to));
+          } else {
+            ranges.push(LINK.range(node.from, node.to));
+          }
         } else if (type === 'TaskMarker') {
           const text = view.state.doc.sliceString(node.from, node.to);
           ranges.push(
@@ -467,9 +540,10 @@ export const livePreviewTheme = EditorView.baseTheme({
     padding: '0 2px',
   },
   '.cm-md-link': {
-    color: 'var(--editor-link, #4ea1ff)',
+    color: 'var(--editor-link, #4ea1ff) !important',
     textDecoration: 'underline',
   },
+  '&.cm-mod-down .cm-md-link:hover': { cursor: 'pointer' },
   '.cm-md-listmark': {
     color: 'var(--editor-link, #4ea1ff)',
     fontWeight: 'bold',
@@ -711,4 +785,6 @@ export const livePreview = [
   headingGutterField,
   livePreviewTheme,
   bulletAutoSpace,
+  linkClickHandler,
+  modKeyHover,
 ];

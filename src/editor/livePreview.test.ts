@@ -6,6 +6,7 @@ import {
   toggleTaskMarkerText,
   tableField,
   bulletAutoSpaceInsert,
+  getLinkUrlAt,
 } from './livePreview';
 
 const mdLang = markdown({ extensions: GFM });
@@ -56,6 +57,32 @@ describe('bulletAutoSpaceInsert', () => {
       extensions: [mdLang],
     });
     expect(bulletAutoSpaceInsert(state, 4, 4, '-')).toBeNull();
+  });
+});
+
+describe('getLinkUrlAt', () => {
+  it('finds the destination of an inline [text](url) link', () => {
+    const doc = '[example](https://example.com)';
+    const state = EditorState.create({ doc, extensions: [mdLang] });
+    expect(getLinkUrlAt(state, 3)).toBe('https://example.com');
+  });
+
+  it('finds a bare GFM autolink with no [text](url) wrapper', () => {
+    const doc = 'see https://example.com/path for more';
+    const state = EditorState.create({ doc, extensions: [mdLang] });
+    expect(getLinkUrlAt(state, 8)).toBe('https://example.com/path');
+  });
+
+  it('finds a bracketed <url> autolink', () => {
+    const doc = '<https://example.com>';
+    const state = EditorState.create({ doc, extensions: [mdLang] });
+    expect(getLinkUrlAt(state, 5)).toBe('https://example.com');
+  });
+
+  it('returns null for plain text', () => {
+    const doc = 'just some text';
+    const state = EditorState.create({ doc, extensions: [mdLang] });
+    expect(getLinkUrlAt(state, 5)).toBeNull();
   });
 });
 

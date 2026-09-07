@@ -30,6 +30,7 @@
       "identifier": "fs:allow-watch",
       "allow": [{ "path": "**" }]
     },
-    "store:default"
+    "store:default",
+    "opener:default"
   ]
 }

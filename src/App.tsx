@@ -54,8 +54,20 @@ export default function App() {
 
   // Kept in a ref so the keydown/close-request listeners (registered once on
   // mount) always see the latest values without needing to be re-registered.
-  const latest = useRef({ path, fileName, dirty, wrap });
-  latest.current = { path, fileName, dirty, wrap };
+  const latest = useRef({
+    path,
+    fileName,
+    dirty,
+    wrap,
+    liveMarkdownPreview: settings.liveMarkdownPreview,
+  });
+  latest.current = {
+    path,
+    fileName,
+    dirty,
+    wrap,
+    liveMarkdownPreview: settings.liveMarkdownPreview,
+  };
   const lastSelfWriteRef = useRef(0);
 
   const isMd = isMarkdownFile(fileName);
@@ -211,6 +223,11 @@ export default function App() {
       } else if (key === 's') {
         e.preventDefault();
         void performSave();
+      } else if (key === 'e') {
+        e.preventDefault();
+        if (isMarkdownFile(latest.current.fileName)) {
+          setLiveMarkdownPreview(!latest.current.liveMarkdownPreview);
+        }
       }
     }
 
