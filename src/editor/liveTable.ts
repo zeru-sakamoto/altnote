@@ -704,7 +704,7 @@ function makeEditableCell(
   return cell;
 }
 
-function makeMenuItem(
+export function makeMenuItem(
   label: string,
   onClick: () => void,
   opts?: {
@@ -732,18 +732,18 @@ function makeMenuItem(
   return btn;
 }
 
-function makeMenuDivider(): HTMLElement {
+export function makeMenuDivider(): HTMLElement {
   const div = document.createElement('div');
   div.className = 'cm-md-table-menu-divider';
   return div;
 }
 
-interface PopoverState {
+export interface PopoverState {
   el: HTMLElement | null;
   cleanup: (() => void) | null;
 }
 
-function closePopover(state: PopoverState) {
+export function closePopover(state: PopoverState) {
   state.el?.remove();
   state.el = null;
   state.cleanup?.();
@@ -754,7 +754,7 @@ function closePopover(state: PopoverState) {
  * must be `position: relative`) — no anchor-positioning API needed since it
  * never has to escape the anchor's own box. Dismisses itself on an outside
  * pointerdown or Escape; only one popover is ever open at a time per `state`. */
-function openPopover(
+export function openPopover(
   state: PopoverState,
   anchor: HTMLElement,
   className: string,

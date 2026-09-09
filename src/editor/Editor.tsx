@@ -4,11 +4,15 @@ import { EditorView } from '@codemirror/view';
 import { syntaxHighlighting } from '@codemirror/language';
 import { basicSetup } from 'codemirror';
 import { vsCodeKeymap } from './keymap';
-import { languageForFile, isMarkdownFile } from './languages';
+import { languageForFile, isMarkdownFile, isProseFile } from './languages';
 import { livePreview, currentFilePath } from './livePreview';
 import { slashCommands } from './slashCommands';
+import { spellcheckPlugin, spellcheckTheme, wordBankFacet } from './spellcheck';
 import { getActiveTheme } from '../theme/store';
-import { subscribe as subscribeSettings } from '../settings/store';
+import {
+  subscribe as subscribeSettings,
+  getSettingsSnapshot,
+} from '../settings/store';
 import styles from './Editor.module.css';
 
 export interface EditorHandle {
@@ -34,6 +38,10 @@ function livePreviewExtension(fileName: string, liveMarkdownPreview: boolean) {
 
 function slashCommandsExtension(fileName: string) {
   return isMarkdownFile(fileName) ? [slashCommands] : [];
+}
+
+function spellcheckExtension(fileName: string) {
+  return isProseFile(fileName) ? [spellcheckPlugin, spellcheckTheme] : [];
 }
 
 function lineNumbersExtension(show: boolean) {
@@ -133,6 +141,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     theme: new Compartment(),
     filePath: new Compartment(),
     lineNumbers: new Compartment(),
+    spellcheck: new Compartment(),
+    wordBank: new Compartment(),
   }).current;
 
   useImperativeHandle(
@@ -175,6 +185,14 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
         compartments.theme.of(themeExtension()),
         compartments.filePath.of(currentFilePath.of(filePath)),
         compartments.lineNumbers.of(lineNumbersExtension(lineNumbers)),
+        compartments.spellcheck.of(spellcheckExtension(fileName)),
+        compartments.wordBank.of(
+          wordBankFacet.of(new Set(getSettingsSnapshot().wordBank)),
+        ),
+        // Custom spellcheck fully replaces the browser/webview's native
+        // spellcheck everywhere (including code files) — always off, not
+        // tied to the `spellcheck` compartment, to avoid double squiggles.
+        EditorView.contentAttributes.of({ spellcheck: 'false' }),
         EditorView.updateListener.of((update) => {
           if (!update.docChanged) return;
           const isLoad = update.transactions.some((tr) =>
@@ -249,6 +267,32 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     });
   }, [lineNumbers]);
 
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: compartments.spellcheck.reconfigure(
+        spellcheckExtension(fileName),
+      ),
+    });
+  }, [fileName]);
+
+  // Word bank changes originate from the spellcheck popover calling into the
+  // settings store, not from a prop — same reason the `theme` compartment
+  // below subscribes directly instead of taking a prop.
+  useEffect(() => {
+    let lastWordBank = getSettingsSnapshot().wordBank;
+    const reconfigureWordBank = () => {
+      const { wordBank } = getSettingsSnapshot();
+      if (wordBank === lastWordBank) return;
+      lastWordBank = wordBank;
+      viewRef.current?.dispatch({
+        effects: compartments.wordBank.reconfigure(
+          wordBankFacet.of(new Set(wordBank)),
+        ),
+      });
+    };
+    return subscribeSettings(reconfigureWordBank);
+  }, []);
+
   // Editor has no theme prop — theme changes originate in Settings/ThemePicker, so this
   // subscribes directly to the settings store rather than depending on props. The store
   // notifies on every settings change (not just theme ones), so skip the reconfigure —
@@ -268,7 +312,13 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
     return subscribeSettings(reconfigureTheme);
   }, []);
 
-  return <div className={styles.editor} ref={containerRef} />;
+  return (
+    <div
+      className={styles.editor}
+      data-live-preview={isMarkdownFile(fileName) && liveMarkdownPreview}
+      ref={containerRef}
+    />
+  );
 });
 
 export default Editor;

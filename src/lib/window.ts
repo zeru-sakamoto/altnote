@@ -10,7 +10,7 @@ export function createEditorWindow(path?: string): WebviewWindow {
   const { lastWindowWidth, lastWindowHeight } = getSettingsSnapshot();
   return new WebviewWindow(label, {
     url,
-    title: 'Untitled — AltNote',
+    title: 'Untitled.md — AltNote',
     width: lastWindowWidth ?? 800,
     height: lastWindowHeight ?? 600,
     decorations: false,

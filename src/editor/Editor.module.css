@@ -3,3 +3,11 @@
   width: 100%;
   overflow: hidden;
 }
+
+.editor[data-live-preview='true'] :global(.cm-scroller) {
+  font-family: var(
+    --live-preview-font,
+    var(--editor-font, ui-monospace, monospace)
+  );
+  font-size: var(--live-preview-font-size, var(--editor-font-size, 14px));
+}

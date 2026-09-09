@@ -81,3 +81,9 @@ export function isMarkdownFile(fileName: string): boolean {
   const ext = fileName.split('.').pop()?.toLowerCase();
   return ext === 'md' || ext === 'markdown';
 }
+
+/** True for markdown and plain-text files — anything without a registered code language. */
+export function isProseFile(fileName: string): boolean {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  return isMarkdownFile(fileName) || !ext || !(ext in byExtension);
+}

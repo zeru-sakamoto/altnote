@@ -44,7 +44,7 @@ export default function App() {
   const settings = useSettings();
 
   const [path, setPath] = useState<string | null>(null);
-  const [fileName, setFileName] = useState('Untitled');
+  const [fileName, setFileName] = useState('Untitled.md');
   const [dirty, setDirty] = useState(false);
   const [wrap, setWrap] = useState(true);
   const [docText, setDocText] = useState('');
@@ -115,7 +115,7 @@ export default function App() {
   async function newFile() {
     if (!(await ensureSaved())) return;
     setPath(null);
-    setFileName('Untitled');
+    setFileName('Untitled.md');
     setDirty(false);
     editorRef.current?.loadContent('');
   }
@@ -313,6 +313,54 @@ export default function App() {
       root.removeProperty('--editor-font-size');
     }
   }, [settings.fontSize]);
+
+  useEffect(() => {
+    const root = document.documentElement.style;
+    if (settings.livePreviewFont) {
+      root.setProperty(
+        '--live-preview-font',
+        `'${settings.livePreviewFont}', ui-monospace, monospace`,
+      );
+    } else {
+      root.removeProperty('--live-preview-font');
+    }
+  }, [settings.livePreviewFont]);
+
+  useEffect(() => {
+    const root = document.documentElement.style;
+    if (settings.livePreviewFontSize) {
+      root.setProperty(
+        '--live-preview-font-size',
+        `${settings.livePreviewFontSize}px`,
+      );
+    } else {
+      root.removeProperty('--live-preview-font-size');
+    }
+  }, [settings.livePreviewFontSize]);
+
+  useEffect(() => {
+    const root = document.documentElement.style;
+    if (settings.previewPaneFont) {
+      root.setProperty(
+        '--preview-pane-font',
+        `'${settings.previewPaneFont}', ui-monospace, monospace`,
+      );
+    } else {
+      root.removeProperty('--preview-pane-font');
+    }
+  }, [settings.previewPaneFont]);
+
+  useEffect(() => {
+    const root = document.documentElement.style;
+    if (settings.previewPaneFontSize) {
+      root.setProperty(
+        '--preview-pane-font-size',
+        `${settings.previewPaneFontSize}px`,
+      );
+    } else {
+      root.removeProperty('--preview-pane-font-size');
+    }
+  }, [settings.previewPaneFontSize]);
 
   useEffect(() => {
     const theme = getActiveTheme();

@@ -5,6 +5,11 @@
   box-sizing: border-box;
   background-color: var(--editor-bg);
   color: var(--editor-fg);
+  font-family: var(
+    --preview-pane-font,
+    var(--editor-font, ui-monospace, monospace)
+  );
+  font-size: var(--preview-pane-font-size, var(--editor-font-size, 14px));
   /* Border moved to a Tailwind class (border-l border-border) in PreviewPane.tsx — kept out
      of this unlayered CSS-Modules rule so it doesn't permanently beat the layered Tailwind
      utility regardless of which one is "more specific" (see src/index.css cascade-layer note). */
