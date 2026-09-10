@@ -334,6 +334,7 @@ const vsCodeBindings: readonly KeyBinding[] = [
   { key: 'Alt-ArrowUp', run: moveLineUp },
   { key: 'Alt-ArrowDown', run: moveLineDown },
   { key: 'Mod-/', run: toggleComment },
+  { key: 'Mod-f', run: openSearchPanel },
   { key: 'Mod-h', run: openSearchPanel },
   {
     key: 'Mod-b',

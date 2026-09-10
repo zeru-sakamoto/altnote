@@ -750,10 +750,39 @@ export function closePopover(state: PopoverState) {
   state.cleanup = null;
 }
 
+const VIEWPORT_MARGIN = 4;
+
+/** Nudges an already-mounted, absolutely-positioned popover back within the
+ * viewport if its default CSS placement would overflow — flips it above its
+ * anchor when it overflows the bottom, and shifts it left when it overflows
+ * the right edge. Leaves `pop`'s CSS untouched when there's no overflow. */
+function clampToViewport(pop: HTMLElement) {
+  const rect = pop.getBoundingClientRect();
+  // pop.offsetLeft/offsetTop are already anchor-relative regardless of
+  // whether the current placement came from `left`, `right`, or flow
+  // defaults, so shifting is just "move by N px" in that same space.
+  const overflowRight = rect.right - (window.innerWidth - VIEWPORT_MARGIN);
+  if (overflowRight > 0) {
+    const shiftX = Math.min(overflowRight, rect.left - VIEWPORT_MARGIN);
+    if (shiftX > 0) {
+      pop.style.right = 'auto';
+      pop.style.left = `${pop.offsetLeft - shiftX}px`;
+    }
+  }
+  const overflowBottom = rect.bottom - (window.innerHeight - VIEWPORT_MARGIN);
+  if (overflowBottom > 0 && rect.top - rect.height >= VIEWPORT_MARGIN) {
+    pop.style.top = 'auto';
+    pop.style.bottom = '100%';
+  }
+}
+
 /** Opens a dropdown as a plain absolutely-positioned child of `anchor` (which
- * must be `position: relative`) — no anchor-positioning API needed since it
- * never has to escape the anchor's own box. Dismisses itself on an outside
- * pointerdown or Escape; only one popover is ever open at a time per `state`. */
+ * must be `position: relative`). Positioned via CSS by default, but after
+ * mounting we check its actual bounding box against the viewport and nudge
+ * it back on-screen (flipping above the anchor, or shifting horizontally)
+ * if it would otherwise overflow — e.g. a right-click near a window edge.
+ * Dismisses itself on an outside pointerdown or Escape; only one popover is
+ * ever open at a time per `state`. */
 export function openPopover(
   state: PopoverState,
   anchor: HTMLElement,
@@ -766,6 +795,7 @@ export function openPopover(
   items.forEach((el) => pop.appendChild(el));
   anchor.appendChild(pop);
   state.el = pop;
+  clampToViewport(pop);
 
   const onOutside = (e: PointerEvent) => {
     if (!pop.contains(e.target as Node)) closePopover(state);

@@ -2,8 +2,10 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { Compartment, Prec } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { syntaxHighlighting } from '@codemirror/language';
+import { search } from '@codemirror/search';
 import { basicSetup } from 'codemirror';
 import { vsCodeKeymap } from './keymap';
+import { createFindPanel, findPanelTheme } from './findPanel';
 import { languageForFile, isMarkdownFile, isProseFile } from './languages';
 import { livePreview, currentFilePath } from './livePreview';
 import { slashCommands } from './slashCommands';
@@ -175,6 +177,8 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       extensions: [
         basicSetup,
         editorTheme,
+        search({ createPanel: createFindPanel, top: true }),
+        findPanelTheme,
         Prec.highest(vsCodeKeymap),
         compartments.language.of([]),
         compartments.wrap.of(wrap ? EditorView.lineWrapping : []),
